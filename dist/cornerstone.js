@@ -6,6 +6,259 @@ if(typeof cornerstone === 'undefined'){
     };
 }
 
+(function(cornerstone) {
+
+    "use strict";
+
+    var BELOW_RANGE_COLOR_INDEX = 0;
+    var ABOVE_RANGE_COLOR_INDEX = 1;
+    var NAN_COLOR_INDEX = 2;
+    var NUMBER_OF_SPECIAL_COLORS = NAN_COLOR_INDEX + 1;
+
+    function scalarToColor(scalar) {
+        return color;
+    }
+
+    function LookupTable() {
+        this.NumberOfColors = 256;
+        this.Ramp = 'linear';
+        this.TableRange = [0, 255];
+        this.HueRange = [0, 0.66667];
+        this.SaturationRange = [0, 1];
+        this.ValueRange = [0, 1];
+        this.AlphaRange = [1, 1];
+        this.IndexedLookup = false;
+        this.Table = [];
+
+
+        this.setRamp = function(ramp) {
+            this.Ramp = ramp;
+        };
+
+        this.setTableRange = function(start, end) {
+            // Set/Get the minimum/maximum scalar values for scalar mapping. Scalar values less than minimum range value are clamped to minimum range value.
+            // Scalar values greater than maximum range value are clamped to maximum range value. The TableRange values are only used when IndexedLookup is false.
+            this.TableRange[0] = start;
+            this.TableRange[1] = end;
+        };
+
+        this.setHueRange = function(start, end) {
+            // Set the range in hue (using automatic generation). Hue ranges between [0,1].
+            this.HueRange[0] = start;
+            this.HueRange[1] = end;
+        };
+
+        this.setSaturationRange = function(start, end) {
+            // Set the range in saturation (using automatic generation). Saturation ranges between [0,1].
+            this.SaturationRange[0] = start;
+            this.SaturationRange[1] = end;
+        };
+
+        this.setValueRange = function(start, end) {
+            // Set the range in value (using automatic generation). Value ranges between [0,1].
+            this.ValueRange[0] = start;
+            this.ValueRange[1] = end;
+        };
+
+        this.setAlphaRange = function(start, end) {
+            // Set the range in alpha (using automatic generation). Alpha ranges from [0,1].
+            this.AlphaRange[0] = start;
+            this.AlphaRange[1] = end;
+        };
+
+        this.getColor = function(scalar) {
+            // Map one value through the lookup table and return the color as an
+            // RGB array of doubles between 0 and 1.
+            
+            return this.mapValue(scalar);
+        };
+
+        this.getOpacity = function() {
+            return opacity;
+        };
+
+        this.HSVToRGB = function(hue, sat, val) {
+            if (hue > 1) {
+                throw "HSVToRGB expects hue < 1";
+            }
+
+            var rgb = [];
+
+            if (sat === 0) {
+                rgb[0] = val;
+                rgb[1] = val;
+                rgb[2] = val;
+                return rgb;
+            }
+
+            var hueCase = Math.floor(hue * 6);
+            var frac = 6 * hue - hueCase;
+            var lx = val * (1 - sat);
+            var ly = val * (1 - sat * frac);
+            var lz = val * (1 - sat * (1 - frac));
+            
+            switch (hueCase) {
+                /* 0<hue<1/6 */
+                case 0:
+                case 6:
+                    rgb[0] = val;
+                    rgb[1] = lz;
+                    rgb[2] = lx;
+                    break;
+                    /* 1/6<hue<2/6 */
+                case 1:
+                    rgb[0] = ly;
+                    rgb[1] = val;
+                    rgb[2] = lx;
+                    break;
+                    /* 2/6<hue<3/6 */
+                case 2:
+                    rgb[0] = lx;
+                    rgb[1] = val;
+                    rgb[2] = lz;
+                    break;
+                    /* 3/6<hue/4/6 */
+                case 3:
+                    rgb[0] = lx;
+                    rgb[1] = ly;
+                    rgb[2] = val;
+                    break;
+                    /* 4/6<hue<5/6 */
+                case 4:
+                    rgb[0] = lz;
+                    rgb[1] = lx;
+                    rgb[2] = val;
+                    break;
+                    /* 5/6<hue<1 */
+                case 5:
+                    rgb[0] = val;
+                    rgb[1] = lx;
+                    rgb[2] = ly;
+                    break;
+            }
+
+            return rgb;
+        };
+
+        this.build = function() {
+            // Clear the table
+            this.Table = [];
+
+            var maxIndex = this.NumberOfColors - 1;
+
+            var hinc, sinc, vinc, ainc;
+            if (maxIndex) {
+                hinc = (this.HueRange[1] - this.HueRange[0]) / maxIndex;
+                sinc = (this.SaturationRange[1] - this.SaturationRange[0]) / maxIndex;
+                vinc = (this.ValueRange[1] - this.ValueRange[0]) / maxIndex;
+                ainc = (this.AlphaRange[1] - this.AlphaRange[0]) / maxIndex;
+            } else {
+                hinc = sinc = vinc = ainc = 0.0;
+            }
+            
+            for (var i = 0; i < this.NumberOfColors; i++) {
+                var hue = this.HueRange[0] + i * hinc;
+                var sat = this.SaturationRange[0] + i * sinc;
+                var val = this.ValueRange[0] + i * vinc;
+                var alpha = this.AlphaRange[0] + i * ainc;
+
+                var rgb = this.HSVToRGB(hue, sat, val);                
+
+                var c_rgba = [];
+                c_rgba[0] = (127.5 * (1.0 + Math.cos((1.0 - rgb[0]) * Math.PI)));
+                c_rgba[1] = (127.5 * (1.0 + Math.cos((1.0 - rgb[1]) * Math.PI)));
+                c_rgba[2] = (127.5 * (1.0 + Math.cos((1.0 - rgb[2]) * Math.PI)));
+                c_rgba[3] = (alpha * 255.0);
+
+                this.Table.push(c_rgba);
+            }
+        };
+
+        // Given a scalar value v, return an rgba color value from lookup table.
+        this.mapValue = function(v) {
+            var index = this.getIndex(v);
+            if (index < 0) {
+                return this.NaNColor;
+            } else if (index === 0) {
+                if (this.UseBelowRangeColor && v < this.TableRange[0]) {
+                    return this.BelowRangeColor;
+                }
+            } else if (index === this.NumberOfColors - 1) {
+                if (this.UseAboveRangeColor && v > this.TableRange[1]) {
+                    return this.AboveRangeColor;
+                }
+            }
+
+            return this.Table[index];
+        };
+
+        this.linearIndexLookupMain = function(v, p) {
+            var dIndex;
+
+            // NOTE: Added Math.floor since values were not integers? Check VTK source
+            if (v < p.Range[0]) {
+                dIndex = Math.floor(p.MaxIndex + BELOW_RANGE_COLOR_INDEX + 1.5);
+            } else if (v > p.Range[1]) {
+                dIndex = Math.floor(p.MaxIndex + ABOVE_RANGE_COLOR_INDEX + 1.5);
+            } else {
+                dIndex = Math.floor((v + p.Shift) * p.Scale);
+
+                // This conditional is needed because when v is very close to
+                // p.Range[1], it may map above p.MaxIndex in the linear mapping
+                // above.
+                dIndex = (dIndex < p.MaxIndex ? dIndex : p.MaxIndex);
+            }
+
+            return dIndex;
+        };
+
+        this.getIndex = function(v) {
+            if (this.IndexedLookup) {
+                return this.GetAnnotatedValueIndex(v) % this.GetNumberOfTableValues();
+            }
+
+            // First, check whether we have a number...
+            if (isNaN(v)) {
+                // For backwards compatibility
+                return -1;
+            }
+
+            var p = {};
+            p.Range = [];
+            p.MaxIndex = this.NumberOfColors - 1;
+
+            // This was LookupShiftAndScale
+            p.Shift = -this.TableRange[0];
+            if (this.TableRange[1] <= this.TableRange[0]) {
+                p.Scale = DOUBLE_MAX;
+            } else {
+                p.Scale = (p.MaxIndex + 1) / (this.TableRange[1] - this.TableRange[0]);
+            }
+
+            p.Range[0] = this.TableRange[0];
+            p.Range[1] = this.TableRange[1];
+
+            // Map to an index:
+            var index = this.linearIndexLookupMain(v, p);
+
+            // For backwards compatibility, if the index indicates an
+            // out-of-range value, truncate to index range for in-range colors.
+            if (index === this.NumberOfColors + BELOW_RANGE_COLOR_INDEX) {
+                index = 0;
+            } else if (index === this.NumberOfColors + ABOVE_RANGE_COLOR_INDEX) {
+                index = this.NumberOfColors - 1;
+            }
+
+            return index;
+        };
+    }
+
+    // module exports
+    cornerstone.colors = {};
+    cornerstone.colors.scalarToColor = scalarToColor;
+    cornerstone.colors.LookupTable = LookupTable;
+
+}(cornerstone));
 (function (cornerstone) {
 
     "use strict";
@@ -909,6 +1162,182 @@ if(typeof cornerstone === 'undefined'){
 
     "use strict";
 
+    function stringToFloatArray(array) {
+        return array.split('\\').map(function(value) {
+                return parseFloat(value);
+            });
+    }
+
+    function getDrawImageOffset(targetImageId, referenceImageId) {
+        var offset = {
+            x: 0,
+            y: 0
+        };
+
+        var targetImagePlane = cornerstoneTools.metaData.get('imagePlane', targetImageId);
+        if (!targetImagePlane ||
+            !targetImagePlane.imagePositionPatient ||
+            !targetImagePlane.rowCosines ||
+            !targetImagePlane.columnCosines) {
+            return offset;
+        }
+
+        var referenceImagePlane = cornerstoneTools.metaData.get('imagePlane', referenceImageId);
+        if (!referenceImagePlane ||
+            !referenceImagePlane.imagePositionPatient ||
+            !referenceImagePlane.rowCosines ||
+            !referenceImagePlane.columnCosines) {
+            return offset;
+        }
+
+        // TODO: Add Image Orientation check between layers
+        var pos = stringToFloatArray(targetImagePlane.imagePositionPatient);
+        var origPos = stringToFloatArray(referenceImagePlane.imagePositionPatient)
+
+        offset.x = pos[0] - origPos[0];
+        offset.y = pos[1] - origPos[1];
+        return offset;
+    }
+
+
+    // This is used to keep each of the layers' viewports in sync with the base layer
+    var viewportRatio = {};
+
+    /**
+     * Internal API function to draw to an enabled element
+     * @param enabledElement
+     * @param invalidated - true if pixel data has been invalidated and cached rendering should not be used
+     */
+    function renderCompositeImage(enabledElement, invalidated) {
+        // Calculate the base layer's default viewport parameters if they don't already exist
+        // and store them
+        var baseLayer = enabledElement.layers[0];
+        baseLayer.viewport = baseLayer.viewport || cornerstone.internal.getDefaultViewport(enabledElement.canvas, baseLayer.image);
+
+        // Store the base layer's viewport and image data on the enabled element so that tools can interact with it
+        enabledElement.viewport = baseLayer.viewport;
+        enabledElement.image = baseLayer.image;
+
+        // Make an array of only the visible layers to save time
+        var visibleLayers = enabledElement.layers.filter(function(layer) {
+            if (layer.options && layer.options.visible !== false && layer.options.opacity !== 0) {
+                return true;
+            }
+        });
+
+        // If we intend to keep the viewport's scale and translation in sync,
+        // loop through the layers 
+        if (enabledElement.syncViewports === true) {
+            viewportRatio[baseLayer.layerId] = 1;
+            visibleLayers.forEach(function(layer, index) {
+                // Don't do anything to the base layer
+                if (index === 0) {
+                    return;
+                }
+
+                // If no viewport has been set yet for this layer, calculate the default viewport
+                // parameters
+                if (!layer.viewport) {
+                    layer.viewport = cornerstone.internal.getDefaultViewport(enabledElement.canvas, layer.image);
+                    viewportRatio[layer.layerId] = layer.viewport.scale / baseLayer.viewport.scale;   
+                }
+
+                // Update the layer's translation and scale to keep them in sync with the first image
+                // based on the stored ratios between the images
+                layer.viewport.scale = baseLayer.viewport.scale * viewportRatio[layer.layerId];
+                layer.viewport.rotation = baseLayer.viewport.rotation;
+                layer.viewport.translation = {
+                    x: baseLayer.viewport.translation.x * layer.image.width / baseLayer.image.width,
+                    y: baseLayer.viewport.translation.y * layer.image.height / baseLayer.image.height
+                };
+            });    
+        }
+
+        // Get the enabled element's canvas so we can draw to it
+        var context = enabledElement.canvas.getContext('2d');
+        context.setTransform(1, 0, 0, 1, 0, 0);
+
+        // Clear the canvas
+        context.fillStyle = 'black';
+        context.fillRect(0, 0, enabledElement.canvas.width, enabledElement.canvas.height);
+
+        // Loop through each layer and draw it to the canvas
+        visibleLayers.forEach(function(layer, index) {
+            context.save();
+
+            // Set the layer's canvas to the pixel coordinate system
+            layer.canvas = enabledElement.canvas;
+            cornerstone.setToPixelCoordinateSystem(layer, context);
+
+            // Render into the layer's canvas
+            if (layer.image.color === true) {
+                cornerstone.addColorLayer(layer, invalidated);
+            } else {
+                cornerstone.addGrayscaleLayer(layer, invalidated);    
+            }
+
+            // Apply any global opacity settings that have been defined for this layer
+            if (layer.options && layer.options.opacity) {
+                context.globalAlpha = layer.options.opacity;
+            } else {
+                context.globalAlpha = 1;    
+            }
+            
+            // Calculate any offset between the position of the base layer and the current layer
+            var offset = getDrawImageOffset(layer.image.imageId, baseLayer.image.imageId);
+
+            // Draw from the current layer's canvas onto the enabled element's canvas
+            context.drawImage(layer.canvas, 0, 0, layer.image.width, layer.image.height, offset.x, offset.y, layer.image.width, layer.image.height);
+
+            context.restore();
+        });
+    }
+
+
+    /**
+     * Internal API function to draw a composite image to a given enabled element
+     * @param enabledElement
+     * @param invalidated - true if pixel data has been invalidated and cached rendering should not be used
+     */
+    function drawCompositeImage(enabledElement, invalidated) {
+
+        var start = new Date();
+
+        renderCompositeImage(enabledElement, invalidated);
+
+        var context = enabledElement.canvas.getContext('2d');
+
+        var end = new Date();
+        var diff = end - start;
+        //console.log(diff + ' ms');
+
+        var eventData = {
+            viewport : enabledElement.viewport,
+            element : enabledElement.element,
+            layers : enabledElement.layers,
+            enabledElement : enabledElement,
+            canvasContext: context,
+            renderTimeInMs : diff
+        };
+
+        $(enabledElement.element).trigger("CornerstoneImageRendered", eventData);
+        enabledElement.invalid = false;
+    }
+
+    // Module exports
+    cornerstone.internal.drawCompositeImage = drawCompositeImage;
+    cornerstone.internal.renderCompositeImage = renderCompositeImage;
+    cornerstone.drawCompositeImage = drawCompositeImage;
+
+}($, cornerstone));
+/**
+ * This module is responsible for drawing an image to an enabled elements canvas element
+ */
+
+(function ($, cornerstone) {
+
+    "use strict";
+
     /**
      * Internal API function to draw an image to a given enabled element
      * @param enabledElement
@@ -1218,23 +1647,44 @@ if(typeof cornerstone === 'undefined'){
         var storedPixelData = image.getPixelData();
         var localLut = lut;
         var localCanvasImageDataData = canvasImageDataData;
-        // NOTE: As of Nov 2014, most javascript engines have lower performance when indexing negative indexes.
-        // We have a special code path for this case that improves performance.  Thanks to @jpambrun for this enhancement
-        if(minPixelValue < 0){
-            while(storedPixelDataIndex < numPixels) {
-                localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++] + (-minPixelValue)]; // red
-                localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++] + (-minPixelValue)]; // green
-                localCanvasImageDataData[canvasImageDataIndex] = localLut[storedPixelData[storedPixelDataIndex] + (-minPixelValue)]; // blue
-                storedPixelDataIndex+=2;
-                canvasImageDataIndex+=2;
+
+        if (image.rgba === true) {
+            // NOTE: As of Nov 2014, most javascript engines have lower performance when indexing negative indexes.
+            // We have a special code path for this case that improves performance.  Thanks to @jpambrun for this enhancement
+            if(minPixelValue < 0){
+                while(storedPixelDataIndex < numPixels) {
+                    localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++] + (-minPixelValue)]; // red
+                    localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++] + (-minPixelValue)]; // green
+                    localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++] + (-minPixelValue)]; // blue
+                    localCanvasImageDataData[canvasImageDataIndex++] = storedPixelData[storedPixelDataIndex++]; // alpha
+                }
+            }else{
+                while(storedPixelDataIndex < numPixels) {
+                    localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++]]; // red
+                    localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++]]; // green
+                    localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++]]; // blue
+                    localCanvasImageDataData[canvasImageDataIndex++] = storedPixelData[storedPixelDataIndex++]; // alpha
+                }
             }
-        }else{
-            while(storedPixelDataIndex < numPixels) {
-                localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++]]; // red
-                localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++]]; // green
-                localCanvasImageDataData[canvasImageDataIndex] = localLut[storedPixelData[storedPixelDataIndex]]; // blue
-                storedPixelDataIndex+=2;
-                canvasImageDataIndex+=2;
+        } else {
+            // NOTE: As of Nov 2014, most javascript engines have lower performance when indexing negative indexes.
+            // We have a special code path for this case that improves performance.  Thanks to @jpambrun for this enhancement
+            if(minPixelValue < 0){
+                while(storedPixelDataIndex < numPixels) {
+                    localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++] + (-minPixelValue)]; // red
+                    localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++] + (-minPixelValue)]; // green
+                    localCanvasImageDataData[canvasImageDataIndex] = localLut[storedPixelData[storedPixelDataIndex] + (-minPixelValue)]; // blue
+                    storedPixelDataIndex+=2;
+                    canvasImageDataIndex+=2;
+                }
+            }else{
+                while(storedPixelDataIndex < numPixels) {
+                    localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++]]; // red
+                    localCanvasImageDataData[canvasImageDataIndex++] = localLut[storedPixelData[storedPixelDataIndex++]]; // green
+                    localCanvasImageDataData[canvasImageDataIndex] = localLut[storedPixelData[storedPixelDataIndex]]; // blue
+                    storedPixelDataIndex+=2;
+                    canvasImageDataIndex+=2;
+                }
             }
         }
     }
@@ -1617,6 +2067,76 @@ if(typeof cornerstone === 'undefined'){
 
 }(cornerstone));
 
+(function(cornerstone) {
+
+    "use strict";
+
+    function pixelDataToFalseColorData(image, lut) {
+        if (image.color) {
+            throw "Color transforms are not implemented yet";
+        }
+
+        image.color = true;
+        var minPixelValue = image.minPixelValue;
+        var canvasImageDataIndex = 0;
+        var storedPixelDataIndex = 0;
+        var numPixels = image.width * image.height;
+        var origPixelData = image.getPixelData();
+        var storedColorPixelData = new Uint8Array(numPixels * 4);
+        var localLut = lut;
+        var sp, mapped;
+
+        
+        if (lut instanceof cornerstone.colors.LookupTable) {
+            lut.build();
+            
+            while (storedPixelDataIndex < numPixels) {
+                sp = origPixelData[storedPixelDataIndex++];
+                mapped = lut.mapValue(sp);
+                storedColorPixelData[canvasImageDataIndex++] = mapped[0];
+                storedColorPixelData[canvasImageDataIndex++] = mapped[1];
+                storedColorPixelData[canvasImageDataIndex++] = mapped[2];
+                storedColorPixelData[canvasImageDataIndex++] = mapped[3];
+            }
+        } else {
+            if (minPixelValue < 0) {
+                while (storedPixelDataIndex < numPixels) {
+                    sp = origPixelData[storedPixelDataIndex++];
+                    storedColorPixelData[canvasImageDataIndex++] = localLut[sp + (-minPixelValue)][0]; // red
+                    storedColorPixelData[canvasImageDataIndex++] = localLut[sp + (-minPixelValue)][1]; // green
+                    storedColorPixelData[canvasImageDataIndex++] = localLut[sp + (-minPixelValue)][2]; // blue
+                    storedColorPixelData[canvasImageDataIndex++] = localLut[sp + (-minPixelValue)][3]; // alpha
+                }
+            } else {
+                while (storedPixelDataIndex < numPixels) {
+                    sp = origPixelData[storedPixelDataIndex++];
+                    try {
+                        storedColorPixelData[canvasImageDataIndex++] = localLut[sp][0]; // red
+                        storedColorPixelData[canvasImageDataIndex++] = localLut[sp][1]; // green
+                        storedColorPixelData[canvasImageDataIndex++] = localLut[sp][2]; // blue
+                        storedColorPixelData[canvasImageDataIndex++] = localLut[sp][3]; // alpha
+                    } catch(error) {
+                        console.log(sp);
+                        console.log(error);
+                    }
+                }
+            }
+
+        }
+
+        image.rgba = true;
+        image.minPixelValue = 0;
+        image.maxPixelValue = 255;
+        image.windowWidth = 255;
+        image.windowCenter = 128;
+        image.getPixelData = function() {
+            return storedColorPixelData;
+        };
+    }
+
+    cornerstone.pixelDataToFalseColorData = pixelDataToFalseColorData;
+
+}(cornerstone));
 (function (cornerstone) {
 
     "use strict";
@@ -1793,9 +2313,45 @@ if(typeof cornerstone === 'undefined'){
         lastRenderedViewport.vflip = enabledElement.viewport.vflip;
     }
 
+    function addColorLayer(layer, invalidated) {
+        if(layer === undefined) {
+            throw "drawImage: layer parameter must not be undefined";
+        }
+
+        var image = layer.image;
+        if(image === undefined) {
+            throw "drawImage: image must be loaded before it can be drawn";
+        }
+
+
+        layer.canvas = getRenderCanvas(layer, image, invalidated);
+        var context = layer.canvas.getContext('2d');
+
+        // turn off image smooth/interpolation if pixelReplication is set in the viewport
+        if(layer.viewport.pixelReplication === true) {
+            context.imageSmoothingEnabled = false;
+            context.mozImageSmoothingEnabled = false; // firefox doesn't support imageSmoothingEnabled yet
+        } else {
+            context.imageSmoothingEnabled = true;
+            context.mozImageSmoothingEnabled = true;
+        }
+
+        lastRenderedImageId = image.imageId;
+        lastRenderedViewport.windowCenter = layer.viewport.voi.windowCenter;
+        lastRenderedViewport.windowWidth = layer.viewport.voi.windowWidth;
+        lastRenderedViewport.invert = layer.viewport.invert;
+        lastRenderedViewport.rotation = layer.viewport.rotation;
+        lastRenderedViewport.hflip = layer.viewport.hflip;
+        lastRenderedViewport.vflip = layer.viewport.vflip;
+        lastRenderedViewport.modalityLUT = layer.viewport.modalityLUT;
+        lastRenderedViewport.voiLUT = layer.viewport.voiLUT;
+    }
+
     // Module exports
     cornerstone.rendering.colorImage = renderColorImage;
     cornerstone.renderColorImage = renderColorImage;
+    cornerstone.addColorLayer = addColorLayer;
+
 }(cornerstone));
 
 /**
@@ -1957,7 +2513,42 @@ if(typeof cornerstone === 'undefined'){
         lastRenderedViewport.voiLUT = enabledElement.viewport.voiLUT;
     }
 
+    function addGrayscaleLayer(layer, invalidated) {
+        if(layer === undefined) {
+            throw "drawImage: layer parameter must not be undefined";
+        }
+
+        var image = layer.image;
+        if(image === undefined) {
+            throw "drawImage: image must be loaded before it can be drawn";
+        }
+
+
+        layer.canvas = getRenderCanvas(layer, image, invalidated);
+        var context = layer.canvas.getContext('2d');
+
+        // turn off image smooth/interpolation if pixelReplication is set in the viewport
+        if(layer.viewport.pixelReplication === true) {
+            context.imageSmoothingEnabled = false;
+            context.mozImageSmoothingEnabled = false; // firefox doesn't support imageSmoothingEnabled yet
+        } else {
+            context.imageSmoothingEnabled = true;
+            context.mozImageSmoothingEnabled = true;
+        }
+
+        lastRenderedImageId = image.imageId;
+        lastRenderedViewport.windowCenter = layer.viewport.voi.windowCenter;
+        lastRenderedViewport.windowWidth = layer.viewport.voi.windowWidth;
+        lastRenderedViewport.invert = layer.viewport.invert;
+        lastRenderedViewport.rotation = layer.viewport.rotation;
+        lastRenderedViewport.hflip = layer.viewport.hflip;
+        lastRenderedViewport.vflip = layer.viewport.vflip;
+        lastRenderedViewport.modalityLUT = layer.viewport.modalityLUT;
+        lastRenderedViewport.voiLUT = layer.viewport.voiLUT;
+    }
+
     // Module exports
+    cornerstone.addGrayscaleLayer = addGrayscaleLayer;
     cornerstone.rendering.grayscaleImage = renderGrayscaleImage;
     cornerstone.renderGrayscaleImage = renderGrayscaleImage;
 
@@ -2212,11 +2803,15 @@ if(typeof cornerstone === 'undefined'){
     function updateImage(element, invalidated) {
         var enabledElement = cornerstone.getEnabledElement(element);
 
-        if(enabledElement.image === undefined) {
-            throw "updateImage: image has not been loaded yet";
+        if (enabledElement.layers) {
+            cornerstone.drawCompositeImage(enabledElement, invalidated);
+        } else {
+            if(enabledElement.image === undefined) {
+                throw "updateImage: image has not been loaded yet";
+            }
+            
+            cornerstone.drawImage(enabledElement, invalidated);    
         }
-
-        cornerstone.drawImage(enabledElement, invalidated);
     }
 
     // module exports

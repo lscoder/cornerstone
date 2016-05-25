@@ -1,0 +1,149 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <!-- twitter bootstrap CSS stylesheet - not required by cornerstone -->
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- cornerstone css - provides some useful css classes -->
+    <link href="../../dist/cornerstone.css" rel="stylesheet">
+
+</head>
+<body>
+<div class="container">
+
+    <h1>
+        layers/index.html
+    </h1>
+
+    Layers Example
+
+    
+    <div class="row">
+        <div class="col-xs-10">
+            <!-- note we disable selection on the top most div -->
+            <div style="width:512px;height:512px;position:relative;color: white;"
+                 class="cornerstone-enabled-image"
+                 oncontextmenu="return false"
+                 unselectable='on'
+                 onselectstart='return false;'
+                 onmousedown='return false;'>
+                <div id="dicomImage"
+                     style="width:512px;height:512px;top:0px;left:0px; position:absolute">
+                </div>
+            </div>
+        </div>
+        <div class="col-xs-2">
+            <label for="opacityImage1"> Opacity Image 1 </label>
+            <input id="opacityImage1" type="range" class="range" min=0 max=1 step=0.1 value=1>
+
+            <label for="opacityImage2"> Opacity Image 2 </label>
+            <input id="opacityImage2" type="range" class="range" min=0 max=1 step=0.1 value=1>
+        </div>
+    </div>
+</div>
+</body>
+
+<!-- cornerstone depends on jQuery so it must be loaded first-->
+<script src="../jquery.min.js"></script>
+
+<!-- include the cornerstone library -->
+<script src="../../dist/cornerstone.js"></script>
+
+<script src="../cornerstoneMath.js"></script>
+<script src="../cornerstoneTools.js"></script>
+
+<!-- include special code for these examples which provides images -->
+<script src="../exampleImageIdLoaderCt.js"></script>
+
+<script>
+
+    $(document).ready(function() {
+
+        function getPixelData() {
+            var width = this.width;
+            var height = this.height;
+            var numPixels = width * height;
+            var pixelData = new Uint16Array(numPixels);
+            var index = 0;
+            for (var y = 0; y < height; y++) {
+                for (var x = 0; x < width; x++) {
+                    pixelData[index] = ((x) % 256);
+                    index++;
+                }
+            }
+            return pixelData;
+        }
+
+        var dynamicImage = {
+            imageId: "notneeded",
+            minPixelValue: 0,
+            maxPixelValue: 255,
+            slope: 1.0,
+            intercept: 0,
+            windowCenter: 127,
+            windowWidth: 256,
+            render: cornerstone.renderGrayscaleImage,
+            getPixelData: getPixelData,
+            rows: 4000,
+            columns: 4000,
+            height: 4000,
+            width: 4000,
+            color: false,
+            columnPixelSpacing: 1.0,
+            rowPixelSpacing: 1.0,
+            invert: false,
+            sizeInBytes: 4000 * 4000 * 2
+         };
+
+        // image enable the dicomImage element
+        var element = $('#dicomImage').get(0);
+        cornerstone.enable(element);
+
+        var imageId = 'ctexample://1';
+
+        var layer1id, layer2id;
+        cornerstone.loadImage(imageId).then(function(image) {
+            layer1id = cornerstone.addLayer(element, image, {
+                opacity: 1
+            });
+
+            cornerstone.updateImage(element);
+
+            cornerstoneTools.mouseInput.enable(element);
+            cornerstoneTools.mouseWheelInput.enable(element);
+            // Enable all tools we want to use with this element
+            cornerstoneTools.wwwc.activate(element, 1); // ww/wc is the default tool for left mouse button
+            cornerstoneTools.pan.activate(element, 2); // pan is the default tool for middle mouse button
+            cornerstoneTools.zoom.activate(element, 4); // zoom is the default tool for right mouse button
+            cornerstoneTools.stackScrollWheel.activate(element);
+
+        }, function(error) {
+            console.log(error);
+        });
+        
+
+        var lookupTable = new cornerstone.colors.LookupTable();
+        lookupTable.setValueRange(dynamicImage.minPixelValue, dynamicImage.maxPixelValue);
+        cornerstone.pixelDataToFalseColorData(dynamicImage, lookupTable);
+        
+        layer2id = cornerstone.addLayer(element, dynamicImage, {
+            opacity: 0.5
+        });
+
+        cornerstone.updateImage(element);
+
+        $("#opacityImage1").change(function(event) {
+            var layer = cornerstone.getLayers(element, layer1id);
+            layer.options.opacity = parseFloat(event.currentTarget.value);
+            cornerstone.updateImage(element);
+        });
+
+        $("#opacityImage2").change(function(event) {
+            var layer = cornerstone.getLayers(element, layer2id);
+            layer.options.opacity = parseFloat(event.currentTarget.value);
+            cornerstone.updateImage(element);
+        });
+    });
+
+</script>
+</html>

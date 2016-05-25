@@ -151,7 +151,43 @@
         lastRenderedViewport.vflip = enabledElement.viewport.vflip;
     }
 
+    function addColorLayer(layer, invalidated) {
+        if(layer === undefined) {
+            throw "drawImage: layer parameter must not be undefined";
+        }
+
+        var image = layer.image;
+        if(image === undefined) {
+            throw "drawImage: image must be loaded before it can be drawn";
+        }
+
+
+        layer.canvas = getRenderCanvas(layer, image, invalidated);
+        var context = layer.canvas.getContext('2d');
+
+        // turn off image smooth/interpolation if pixelReplication is set in the viewport
+        if(layer.viewport.pixelReplication === true) {
+            context.imageSmoothingEnabled = false;
+            context.mozImageSmoothingEnabled = false; // firefox doesn't support imageSmoothingEnabled yet
+        } else {
+            context.imageSmoothingEnabled = true;
+            context.mozImageSmoothingEnabled = true;
+        }
+
+        lastRenderedImageId = image.imageId;
+        lastRenderedViewport.windowCenter = layer.viewport.voi.windowCenter;
+        lastRenderedViewport.windowWidth = layer.viewport.voi.windowWidth;
+        lastRenderedViewport.invert = layer.viewport.invert;
+        lastRenderedViewport.rotation = layer.viewport.rotation;
+        lastRenderedViewport.hflip = layer.viewport.hflip;
+        lastRenderedViewport.vflip = layer.viewport.vflip;
+        lastRenderedViewport.modalityLUT = layer.viewport.modalityLUT;
+        lastRenderedViewport.voiLUT = layer.viewport.voiLUT;
+    }
+
     // Module exports
     cornerstone.rendering.colorImage = renderColorImage;
     cornerstone.renderColorImage = renderColorImage;
+    cornerstone.addColorLayer = addColorLayer;
+
 }(cornerstone));

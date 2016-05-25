@@ -1,0 +1,122 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+  <meta charset="utf-8">
+  <!-- support for mobile touch devices -->
+  <meta name="viewport" content="user-scalable=no, width=device-width, initial-scale=1, maximum-scale=1">
+  
+  <link href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" rel="stylesheet">
+  <link href="../../dist/cornerstone.css" rel="stylesheet">
+
+  <style>
+    /* prevents selection when left click dragging */
+    .disable-selection {
+      -moz-user-select: none; -webkit-user-select: none; -ms-user-select:none; user-select:none;
+    }
+    /* prevents cursor from changing to the i bar on the overlays*/
+    .noIbar {
+      cursor:default;
+    } 
+  </style>
+</head>
+<body style="background-color: #d7d7d7">
+  <div class="container">
+    <div class="page-header">
+      <h1>
+        Segmentation Example
+      </h1>
+      <p>
+        This page contains an example of the segmentation overlay tool
+      </p>
+      <a href="../index.html">Go back to the Examples page</a>
+    </div>
+    
+    Controls:
+    <ul>
+      <li>Left click paint</li>
+      <li>Middle Mouse button drag - pan</li>
+      <li>Right click drag - zoom</li>
+    </ul>
+    
+    <div>
+      <button id="drawErase" class="btn">Erase</button>
+      
+      <div>
+        Radius: <span id="valBox">10</span>px
+        <input id="radiusSlider" type="range" min="5" max="20" value="10" steps="1" style="width: 200px"/>
+      </div>
+    </div>
+
+    <div style="width:512px;height:512px;position:relative;display:inline-block;"
+        oncontextmenu="return false"
+        class='cornerstone-enabled-image disable-selection noIbar'
+        unselectable='on'
+        onselectstart='return false;'
+        onmousedown='return false;'>
+      <div id="dicomImage"
+        style="width:512px;height:512px;top:0px;left:0px; position:absolute;
+               border: 1px blue solid;">
+      </div>
+    </div>
+  </div>
+</body>
+
+<!-- jquery - included to make things easier to demo, not needed or used by the cornerstone library but
+is used by our example image loader-->
+<script src="../jquery.min.js"></script>
+
+<!-- include the cornerstone library -->
+<script src="../../dist/cornerstone.js"></script>
+  
+<script src="../cornerstoneMath.js"></script>
+
+<!-- include the cornerstone tools library -->
+<script src="../cornerstoneTools.js"></script>
+
+<!-- include special code for these examples which provides images -->
+<script src="../exampleImageIdLoaderCt.js"></script>
+
+<script>
+  var radius = 10; // 10 as default value
+  
+  var element = $('#dicomImage').get(0);
+  var imageId = 'ctexample://1';
+  
+  var configuration = cornerstoneTools.overlay.getConfiguration();
+  configuration.radius = radius;
+  cornerstoneTools.overlay.setConfiguration(configuration);
+
+  
+  // image enable the dicomImage element
+  cornerstone.enable(element);
+  
+  cornerstone.loadImage(imageId).then(function(image) {
+    cornerstone.addLayer(element, image);
+    
+    cornerstoneTools.mouseInput.enable(element);
+    cornerstoneTools.pan.activate(element, 2);
+    cornerstoneTools.zoom.activate(element, 4);
+    
+    cornerstoneTools.overlay.activate(element, 1);
+  });
+
+  $('#drawErase').click(function (e) {
+    if (configuration.draw == 0) {
+      configuration.draw = 1;
+      $('#drawErase').text("Erase");
+    } else {
+      configuration.draw = 0;
+      $('#drawErase').text("Draw");
+    }
+    cornerstoneTools.overlay.setConfiguration(configuration);
+  });
+
+  $('#radiusSlider').on('input', function(){
+    var newRadius = $('#radiusSlider').val();
+    $('#valBox').text(newRadius);
+    configuration.radius = newRadius;
+    cornerstoneTools.overlay.setConfiguration(configuration);
+  });
+  
+</script>
+</html>
