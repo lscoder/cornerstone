@@ -16,12 +16,22 @@
         this.Ramp = 'linear';
         this.TableRange = [0, 255];
         this.HueRange = [0, 0.66667];
-        this.SaturationRange = [0, 1];
-        this.ValueRange = [0, 1];
+        this.SaturationRange = [1, 1];
+        this.ValueRange = [1, 1];
         this.AlphaRange = [1, 1];
+        this.NaNColor = [128, 0, 0, 255];
+        this.BelowRangeColor = [0, 0, 0, 255];
+        this.UseBelowRangeColor = true;
+        this.AboveRangeColor = [255, 255, 255, 255];
+        this.UseAboveRangeColor = true;
+        this.InputRange = [0, 255];
         this.IndexedLookup = false;
         this.Table = [];
 
+
+        this.setNumberOfTableValues = function(number) {
+            this.NumberOfColors = number;
+        };
 
         this.setRamp = function(ramp) {
             this.Ramp = ramp;
@@ -50,6 +60,11 @@
             // Set the range in value (using automatic generation). Value ranges between [0,1].
             this.ValueRange[0] = start;
             this.ValueRange[1] = end;
+        };
+
+        this.setRange = function(start, end) {
+            this.InputRange[0] = start;
+            this.InputRange[1] = end;
         };
 
         this.setAlphaRange = function(start, end) {
@@ -132,7 +147,11 @@
             return rgb;
         };
 
-        this.build = function() {
+        this.build = function(force) {
+            if((this.Table.length > 1) && !force) {
+                return;
+            }
+
             // Clear the table
             this.Table = [];
 
@@ -148,22 +167,68 @@
                 hinc = sinc = vinc = ainc = 0.0;
             }
             
-            for (var i = 0; i < this.NumberOfColors; i++) {
+            for (var i = 0; i <= maxIndex; i++) {
                 var hue = this.HueRange[0] + i * hinc;
                 var sat = this.SaturationRange[0] + i * sinc;
                 var val = this.ValueRange[0] + i * vinc;
                 var alpha = this.AlphaRange[0] + i * ainc;
 
-                var rgb = this.HSVToRGB(hue, sat, val);                
-
+                var rgb = this.HSVToRGB(hue, sat, val);
                 var c_rgba = [];
-                c_rgba[0] = (127.5 * (1.0 + Math.cos((1.0 - rgb[0]) * Math.PI)));
-                c_rgba[1] = (127.5 * (1.0 + Math.cos((1.0 - rgb[1]) * Math.PI)));
-                c_rgba[2] = (127.5 * (1.0 + Math.cos((1.0 - rgb[2]) * Math.PI)));
-                c_rgba[3] = (alpha * 255.0);
+
+                switch(this.Ramp) {
+                    case 'scurve':
+                        c_rgba[0] = Math.floor(127.5 * (1.0 + Math.cos((1.0 - rgb[0]) * Math.PI)));
+                        c_rgba[1] = Math.floor(127.5 * (1.0 + Math.cos((1.0 - rgb[1]) * Math.PI)));
+                        c_rgba[2] = Math.floor(127.5 * (1.0 + Math.cos((1.0 - rgb[2]) * Math.PI)));
+                        c_rgba[3] = Math.floor(alpha * 255);
+                        break;
+                    case 'linear':
+                        c_rgba[0] = Math.floor(rgb[0] * 255 + 0.5);
+                        c_rgba[1] = Math.floor(rgb[1] * 255 + 0.5);
+                        c_rgba[2] = Math.floor(rgb[2] * 255 + 0.5);
+                        c_rgba[3] = Math.floor(alpha * 255 + 0.5);
+                        break;
+                    case 'sqrt':
+                        c_rgba[0] = Math.floor(Math.sqrt(rgb[0]) * 255 + 0.5);
+                        c_rgba[1] = Math.floor(Math.sqrt(rgb[1]) * 255 + 0.5);
+                        c_rgba[2] = Math.floor(Math.sqrt(rgb[2]) * 255 + 0.5);
+                        c_rgba[3] = Math.floor(Math.sqrt(alpha) * 255 + 0.5);
+                        break;
+                    default:
+                        throw new Error('Invalid Ramp value (' + this.Ramp + ')');
+                }
 
                 this.Table.push(c_rgba);
             }
+
+            this.buildSpecialColors();
+        };
+
+        this.buildSpecialColors = function() {
+            var numberOfColors = this.NumberOfColors;
+            var belowRangeColorIndex = numberOfColors + BELOW_RANGE_COLOR_INDEX;
+            var aboveRangeColorIndex = numberOfColors + ABOVE_RANGE_COLOR_INDEX;
+            var nanColorIndex = numberOfColors + NAN_COLOR_INDEX;
+
+            // Below range color
+            if (this.UseBelowRangeColor || numberOfColors === 0) {
+                this.Table[belowRangeColorIndex] = this.BelowRangeColor;
+            } else {
+                // Duplicate the first color in the table.
+                this.Table[belowRangeColorIndex] = this.Table[0];
+            }
+
+            // Above range color
+            if (this.UseAboveRangeColor || numberOfColors === 0) {
+                this.Table[aboveRangeColorIndex] = this.AboveRangeColor;
+            } else {
+                // Duplicate the last color in the table.
+                this.Table[aboveRangeColorIndex] = this.Table[numberOfColors - 1];
+            }
+
+            // Always use NanColor
+            this.Table[nanColorIndex] = this.NaNColor;
         };
 
         // Given a scalar value v, return an rgba color value from lookup table.
@@ -189,30 +254,19 @@
 
             // NOTE: Added Math.floor since values were not integers? Check VTK source
             if (v < p.Range[0]) {
-                dIndex = Math.floor(p.MaxIndex + BELOW_RANGE_COLOR_INDEX + 1.5);
+                dIndex = p.MaxIndex + BELOW_RANGE_COLOR_INDEX + 1.5;
             } else if (v > p.Range[1]) {
-                dIndex = Math.floor(p.MaxIndex + ABOVE_RANGE_COLOR_INDEX + 1.5);
+                dIndex = p.MaxIndex + ABOVE_RANGE_COLOR_INDEX + 1.5;
             } else {
-                dIndex = Math.floor((v + p.Shift) * p.Scale);
-
-                // This conditional is needed because when v is very close to
-                // p.Range[1], it may map above p.MaxIndex in the linear mapping
-                // above.
-                dIndex = (dIndex < p.MaxIndex ? dIndex : p.MaxIndex);
+                dIndex = (v + p.Shift) * p.Scale;
             }
 
-            return dIndex;
+            return Math.round(dIndex);
         };
 
         this.getIndex = function(v) {
             if (this.IndexedLookup) {
                 return this.GetAnnotatedValueIndex(v) % this.GetNumberOfTableValues();
-            }
-
-            // First, check whether we have a number...
-            if (isNaN(v)) {
-                // For backwards compatibility
-                return -1;
             }
 
             var p = {};
@@ -222,13 +276,19 @@
             // This was LookupShiftAndScale
             p.Shift = -this.TableRange[0];
             if (this.TableRange[1] <= this.TableRange[0]) {
-                p.Scale = DOUBLE_MAX;
+                p.Scale = Number.MAX_VALUE;
             } else {
-                p.Scale = (p.MaxIndex + 1) / (this.TableRange[1] - this.TableRange[0]);
+                p.Scale = p.MaxIndex / (this.TableRange[1] - this.TableRange[0]);
             }
 
             p.Range[0] = this.TableRange[0];
             p.Range[1] = this.TableRange[1];
+
+            // First, check whether we have a number...
+            if (isNaN(v)) {
+                // For backwards compatibility
+                return -1;
+            }
 
             // Map to an index:
             var index = this.linearIndexLookupMain(v, p);
@@ -242,6 +302,34 @@
             }
 
             return index;
+        };
+
+        this.setTableValue = function(index, rgba) {
+            // Check if it index, red, green, blue and alpha were passed as parameter
+            if(arguments.length === 5) {
+                rgba = Array.prototype.slice.call(arguments, 1);
+            }
+
+            // Check the index to make sure it is valid
+            if (index < 0) {
+                throw new Error('Can\'t set the table value for negative index (' + index + ')');
+            }
+
+            if (index >= this.NumberOfColors) {
+                new Error('Index ' + index + ' is greater than the number of colors ' + this.NumberOfColors);
+            }
+
+            this.Table[index] = rgba;
+
+            if ((index === 0) || (index === this.NumberOfColors - 1)) {
+                // This is needed due to the way the special colors are stored in
+                // the internal table. If Above/BelowRangeColors are not used and
+                // the min/max colors are changed in the table with this member
+                // function, then the colors used for values outside the range may
+                // be incorrect. Calling this here ensures the out-of-range colors
+                // are set correctly.
+                this.buildSpecialColors();
+            }
         };
     }
 

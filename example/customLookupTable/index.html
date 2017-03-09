@@ -12,12 +12,9 @@
 <div class="container">
 
     <h1>
-        test3DArray/index.html
+        customLookupTable/index.html
     </h1>
 
-    Layers Example
-
-    
     <div class="row">
         <div class="col-xs-10">
             <!-- note we disable selection on the top most div -->
@@ -124,9 +121,21 @@
             console.log(error);
         });
         
+
         var lookupTable = new cornerstone.colors.LookupTable();
         lookupTable.setRange(dynamicImage.minPixelValue, dynamicImage.maxPixelValue);
-        lookupTable.setRamp('scurve');
+
+        lookupTable.setNumberOfTableValues(10);
+        lookupTable.setTableValue(0,   0,   0,   0, 255); // Black
+        lookupTable.setTableValue(1, 227, 206,  87, 255); // Banana
+        lookupTable.setTableValue(2, 255,  99,  71, 255); // Tomato
+        lookupTable.setTableValue(3, 245, 222, 179, 255); // Wheat
+        lookupTable.setTableValue(4, 230, 230, 250, 255); // Lavender
+        lookupTable.setTableValue(5, 255, 125,  64, 255); // Flesh
+        lookupTable.setTableValue(6, 135,  38,  87, 255); // Raspberry
+        lookupTable.setTableValue(7, 250, 128, 114, 255); // Salmon
+        lookupTable.setTableValue(8, 188, 252, 201, 255); // Mint
+        lookupTable.setTableValue(9,  51, 160, 201, 255); // Peacock
 
         cornerstone.pixelDataToFalseColorData(dynamicImage, lookupTable);
         
