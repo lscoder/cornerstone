@@ -7,10 +7,6 @@
     var NAN_COLOR_INDEX = 2;
     var NUMBER_OF_SPECIAL_COLORS = NAN_COLOR_INDEX + 1;
 
-    function scalarToColor(scalar) {
-        return color;
-    }
-
     function LookupTable() {
         this.NumberOfColors = 256;
         this.Ramp = 'linear';
@@ -334,8 +330,6 @@
     }
 
     // module exports
-    cornerstone.colors = {};
-    cornerstone.colors.scalarToColor = scalarToColor;
     cornerstone.colors.LookupTable = LookupTable;
 
 }(cornerstone));
