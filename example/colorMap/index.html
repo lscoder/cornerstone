@@ -12,7 +12,7 @@
 <div class="container">
 
     <h1>
-        colorMap/index.html
+        colormap/index.html
     </h1>
 
     Color Map Example
@@ -95,8 +95,8 @@
             console.log('IMAGE TWO:');
             console.log(image);
 
-            var colorMap = cornerstone.colors.getColorMap('warm');
-            var lookupTable = colorMap.createLookupTable();
+            var colormap = cornerstone.colors.getColormap('coolwarm');
+            var lookupTable = colormap.createLookupTable();
 
             cornerstone.pixelDataToFalseColorData(image, lookupTable);
 

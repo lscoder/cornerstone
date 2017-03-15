@@ -21,7 +21,6 @@
         this.AboveRangeColor = [255, 255, 255, 255];
         this.UseAboveRangeColor = true;
         this.InputRange = [0, 255];
-        this.IndexedLookup = false;
         this.Table = [];
 
 
@@ -34,8 +33,9 @@
         };
 
         this.setTableRange = function(start, end) {
-            // Set/Get the minimum/maximum scalar values for scalar mapping. Scalar values less than minimum range value are clamped to minimum range value.
-            // Scalar values greater than maximum range value are clamped to maximum range value. The TableRange values are only used when IndexedLookup is false.
+            // Set/Get the minimum/maximum scalar values for scalar mapping.
+            // Scalar values less than minimum range value are clamped to minimum range value.
+            // Scalar values greater than maximum range value are clamped to maximum range value.
             this.TableRange[0] = start;
             this.TableRange[1] = end;
         };
@@ -261,10 +261,6 @@
         };
 
         this.getIndex = function(v) {
-            if (this.IndexedLookup) {
-                return this.GetAnnotatedValueIndex(v) % this.GetNumberOfTableValues();
-            }
-
             var p = {};
             p.Range = [];
             p.MaxIndex = this.NumberOfColors - 1;
