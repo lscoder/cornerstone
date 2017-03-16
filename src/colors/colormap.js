@@ -11,7 +11,7 @@
     gray: {
       name: 'Gray',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red':   [[0, 0, 0], [1, 1, 1]],
         'green': [[0, 0, 0], [1, 1, 1]],
@@ -21,7 +21,7 @@
     jet: {
       name: 'Jet',
       numColors: 256,
-      gama: 1,
+      gamma: 0,
       segmentedData: {
         'red': [[0, 0, 0], [0.35 , 0, 0], [0.66 , 1, 1], [0.89, 1, 1], [1, 0.5, 0.5]],
         'green': [[0, 0, 0], [0.125, 0, 0], [0.375, 1, 1], [0.64, 1, 1], [0.91, 0, 0], [1, 0, 0]],
@@ -31,7 +31,7 @@
     hsv: {
       name: 'HSV',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red': [[0, 1, 1], [0.158730, 1, 1], [0.174603, 0.968750, 0.968750],
                 [0.333333, 0.031250, 0.031250], [0.349206, 0, 0], [0.666667, 0, 0],
@@ -48,7 +48,7 @@
     hot: {
       name: 'Hot',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red':   [[0, 0.0416, 0.0416], [0.365079, 1, 1], [1, 1, 1]],
         'green': [[0, 0, 0], [0.365079, 0, 0], [0.746032, 1, 1], [1, 1, 1]],
@@ -58,7 +58,7 @@
     cool: {
       name: 'Cool',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red': [[0, 0, 0], [1, 1, 1]],
         'green': [[0, 1, 1], [1, 0, 0]],
@@ -68,7 +68,7 @@
     spring: {
       name: 'Spring',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red':   [[0, 1, 1],[1, 1, 1]],
         'green': [[0, 0, 0],[1, 1, 1]],
@@ -78,7 +78,7 @@
     summer: {
       name: 'Summer',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red':   [[0, 0, 0],[1, 1, 1]],
         'green': [[0, 0.5, 0.5],[1, 1, 1]],
@@ -88,7 +88,7 @@
     autumn: {
       name: 'Autumn',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red': [[0, 1, 1], [1, 1, 1]],
         'green': [[0, 0, 0], [1, 1, 1]],
@@ -98,7 +98,7 @@
     winter: {
       name: 'Winter',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red':   [[0, 0, 0],[1, 0, 0]],
         'green': [[0, 0, 0],[1, 1, 1]],
@@ -108,17 +108,17 @@
     bone: {
       name: 'Bone',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red': [[0, 0, 0], [0.746032, 0.652778, 0.652778], [1, 1, 1]],
         'green': [[0, 0, 0], [0.365079, 0.319444, 0.319444], [0.746032, 0.777778, 0.777778], [1, 1, 1]],
         'blue': [[0, 0, 0], [0.365079, 0.444444, 0.444444], [1, 1, 1]]
       }
     },
-    cooper: {
-      name: 'Cooper',
+    copper: {
+      name: 'Copper',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red': [[0, 0, 0], [0.809524, 1, 1], [1, 1, 1]],
         'green': [[0, 0, 0], [1, 0.7812, 0.7812]],
@@ -128,7 +128,7 @@
     spectral: {
       name: 'Spectral',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red': [[0, 0, 0], [0.05, 0.4667, 0.4667], [0.10, 0.5333, 0.5333], [0.15, 0, 0],
                 [0.20, 0, 0], [0.25, 0, 0], [0.30, 0, 0], [0.35, 0, 0],
@@ -153,7 +153,7 @@
     coolwarm: {
       name: 'CoolWarm',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red': [[0, 0.2298057, 0.2298057], [0.03125, 0.26623388, 0.26623388],
                 [0.0625, 0.30386891, 0.30386891], [0.09375, 0.342804478, 0.342804478],
@@ -211,7 +211,7 @@
     blues: {
       name: 'Blues',
       numColors: 256,
-      gama: 1,
+      gamma: 1,
       segmentedData: {
         'red': [[0, 0.9686274528503418, 0.9686274528503418], [0.125, 0.87058824300765991, 0.87058824300765991],
                 [0.25, 0.7764706015586853, 0.7764706015586853], [0.375, 0.61960786581039429, 0.61960786581039429],
@@ -304,14 +304,14 @@
   // 
   // The function returns an array "result" where result[x*(N-1)] gives the closest value for
   // values of x between 0 and 1.
-  function makeMappingArray(N, data, gama) {
+  function makeMappingArray(N, data, gamma) {
     var i;
     var x = [];
     var y0 = [];
     var y1 = [];
     var lut = [];
 
-    gama = gama == null ? 1 : gama;
+    gamma = gamma == null ? 1 : gamma;
 
     for(i = 0; i < data.length; i++) {
       var element = data[i];
@@ -323,7 +323,7 @@
 
     var xLinSpace = linspace(0, 1, N);
     for(i = 0; i < N; i++) {
-      xLinSpace[i] = (N - 1) * Math.pow(xLinSpace[i], gama);
+      xLinSpace[i] = (N - 1) * Math.pow(xLinSpace[i], gamma);
     }
 
     var xLinSpaceIndexes = searchSorted(x, xLinSpace);
@@ -349,16 +349,16 @@
   // segments.
   //
   // https://github.com/stefanv/matplotlib/blob/3f1a23755e86fef97d51e30e106195f34425c9e3/lib/matplotlib/colors.py#L663
-  function createLinearSegmentedColormap(segmentedData, N, gama) {
+  function createLinearSegmentedColormap(segmentedData, N, gamma) {
     var i;
     var lut = [];
 
     N = N == null ? 256 : N;
-    gama = gama == null ? 1 : gama;
+    gamma = gamma == null ? 1 : gamma;
 
-    var redLut = makeMappingArray(N, segmentedData.red, gama);
-    var greenLut = makeMappingArray(N, segmentedData.green, gama);
-    var blueLut = makeMappingArray(N, segmentedData.blue, gama);
+    var redLut = makeMappingArray(N, segmentedData.red, gamma);
+    var greenLut = makeMappingArray(N, segmentedData.green, gamma);
+    var blueLut = makeMappingArray(N, segmentedData.blue, gamma);
 
     for(i = 0; i < N; i++) {
       var red = Math.round(redLut[i] * 255);
@@ -404,7 +404,7 @@
     }
 
     if(!colormap.colors && colormap.segmentedData) {
-      colormap.colors = createLinearSegmentedColormap(colormap.segmentedData, colormap.numColors, colormap.gama);
+      colormap.colors = createLinearSegmentedColormap(colormap.segmentedData, colormap.numColors, colormap.gamma);
     }
 
     return {
