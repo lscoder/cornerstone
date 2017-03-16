@@ -3,20 +3,22 @@
     "use strict";
 
     function pixelDataToFalseColorData(image, lut) {
-        if (image.color) {
+        if (image.color && !image.falseColor) {
             throw "Color transforms are not implemented yet";
         }
 
-        image.color = true;
         var minPixelValue = image.minPixelValue;
         var canvasImageDataIndex = 0;
         var storedPixelDataIndex = 0;
         var numPixels = image.width * image.height;
-        var origPixelData = image.getPixelData();
+        var origPixelData = image.origPixelData || image.getPixelData();
         var storedColorPixelData = new Uint8Array(numPixels * 4);
         var localLut = lut;
         var sp, mapped;
 
+        image.color = true;
+        image.falseColor = true;
+        image.origPixelData = origPixelData;
         
         if (lut instanceof cornerstone.colors.LookupTable) {
             lut.build();
