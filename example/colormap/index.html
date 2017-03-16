@@ -33,12 +33,6 @@
             </div>
         </div>
         <div class="col-xs-2">
-            <label for="opacityImage1"> Opacity Image 1 </label>
-            <input id="opacityImage1" type="range" class="range" min=0 max=1 step=0.1 value=1>
-
-            <label for="opacityImage2"> Opacity Image 2 </label>
-            <input id="opacityImage2" type="range" class="range" min=0 max=1 step=0.1 value=0.5>
-
             <label for="opacityImage2"> Colormap </label>
             <select id="colormaps" style="width:100%"></select>
         </div>
@@ -85,45 +79,17 @@
         var host = window.location.href.replace('/index.html','');
         
         var imageId = 'example://1';
-        var imageId2 = 'example://2';
-        var layer1id, layer2id;
+        var layer1id;
         var falseColorImage;
 
         cornerstone.loadImage(imageId).then(function(image) {
-            layer1id = cornerstone.addLayer(element, image, {
-                opacity: 1
-            });
-
-            console.log('IMAGE ONE:');
-            console.log(image);
-
-            cornerstone.updateImage(element);
-
-            cornerstoneTools.mouseInput.enable(element);
-            cornerstoneTools.mouseWheelInput.enable(element);
-            // Enable all tools we want to use with this element
-            cornerstoneTools.wwwc.activate(element, 1); // ww/wc is the default tool for left mouse button
-            cornerstoneTools.pan.activate(element, 2); // pan is the default tool for middle mouse button
-            cornerstoneTools.zoom.activate(element, 4); // zoom is the default tool for right mouse button
-            cornerstoneTools.stackScrollWheel.activate(element);
-
-        }, function(error) {
-            console.log(error);
-        });
-
-        cornerstone.loadImage(imageId2).then(function(image) {
-            console.log('IMAGE TWO:');
-            console.log(image);
-
-            falseColorImage = image;
+            falseColorImage = image; 
 
             var colormap = cornerstone.colors.getColormap('hot');
             var lookupTable = colormap.createLookupTable();
             cornerstone.pixelDataToFalseColorData(image, lookupTable);
 
-            layer2id = cornerstone.addLayer(element, image, {
-                opacity: 0.5
-            });
+            layer1id = cornerstone.addLayer(element, image);
 
             cornerstone.updateImage(element);
         }, function(error) {
@@ -164,19 +130,6 @@
 
             ctx.putImageData(colorbar, 0, 0);
         }
-
-        $("#opacityImage1").change(function(event) {
-            var layer = cornerstone.getLayers(element, layer1id);
-            layer.options.opacity = parseFloat(event.currentTarget.value);
-            cornerstone.updateImage(element);
-        });
-
-        $("#opacityImage2").change(function(event) {
-            var layer = cornerstone.getLayers(element, layer2id);
-            layer.options.opacity = parseFloat(event.currentTarget.value);
-            cornerstone.updateImage(element);
-        });
-
         $('#colormaps').change(function() {
             colormapChanged();
         });
