@@ -78,19 +78,14 @@
 
         var host = window.location.href.replace('/index.html','');
         
-        var imageId = 'example://1';
+        var imageId = 'example://2';
         var layer1id;
         var falseColorImage;
 
         cornerstone.loadImage(imageId).then(function(image) {
             falseColorImage = image; 
 
-            var colormap = cornerstone.colors.getColormap('hot');
-            var lookupTable = colormap.createLookupTable();
-            cornerstone.pixelDataToFalseColorData(image, lookupTable);
-
-            layer1id = cornerstone.addLayer(element, image);
-
+            cornerstone.addLayer(element, image);
             cornerstone.updateImage(element);
         }, function(error) {
             console.log(error);
@@ -100,6 +95,8 @@
             var colormapId = $('#colormaps').val();
             var colormap = cornerstone.colors.getColormap(colormapId);
             var lookupTable = colormap.createLookupTable();
+            var minPixelValue = falseColorImage.minPixelValue || 0;
+            var maxPixelValue = falseColorImage.maxPixelValue || 255;
 
             cornerstone.pixelDataToFalseColorData(falseColorImage, lookupTable);
             cornerstone.updateImage(element, true);
