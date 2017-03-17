@@ -18,7 +18,7 @@
     <div class="row">
         <div class="col-xs-10">
             <div style="width:512px; padding-top: 5px;">
-                <canvas id="colormapBar" width="512px" height="20px"></canvas>
+                <canvas id="colorbar" width="512px" height="20px"></canvas>
             </div>
             <!-- note we disable selection on the top most div -->
             <div style="width:512px;height:512px;position:relative;color: white;"
@@ -67,8 +67,6 @@
 
             $dropdown.append($option);
         });
-
-        $dropdown.val('hot');
     }
 
     $(document).ready(function() {
@@ -78,34 +76,31 @@
 
         var host = window.location.href.replace('/index.html','');
         
-        var imageId = 'example://2';
+        var imageId = 'example://1';
         var layer1id;
-        var falseColorImage;
 
         cornerstone.loadImage(imageId).then(function(image) {
-            falseColorImage = image; 
-
-            cornerstone.addLayer(element, image);
-            cornerstone.updateImage(element);
+            cornerstone.displayImage(element, image);
         }, function(error) {
             console.log(error);
         });
 
         function colormapChanged() {
             var colormapId = $('#colormaps').val();
+            var image = cornerstone.getEnabledElement(element).image;
             var colormap = cornerstone.colors.getColormap(colormapId);
             var lookupTable = colormap.createLookupTable();
-            var minPixelValue = falseColorImage.minPixelValue || 0;
-            var maxPixelValue = falseColorImage.maxPixelValue || 255;
+            var minPixelValue = image.minPixelValue || 0;
+            var maxPixelValue = image.maxPixelValue || 255;
 
-            cornerstone.pixelDataToFalseColorData(falseColorImage, lookupTable);
+            cornerstone.pixelDataToFalseColorData(image, lookupTable);
             cornerstone.updateImage(element, true);
 
-            updateColormapBar(lookupTable)
+            updateColorbar(lookupTable)
         }
 
-        function updateColormapBar(lookupTable) {
-            var canvas = $('#colormapBar').get(0);
+        function updateColorbar(lookupTable) {
+            var canvas = $('#colorbar').get(0);
             var ctx = canvas.getContext('2d');
             var height = canvas.height;
             var width = canvas.width;
@@ -134,7 +129,10 @@
         fillColormapsList();
 
         setTimeout(function() {
-            $('#colormaps').trigger('change');
+            var $dropdown = $('#colormaps');
+
+            $dropdown.val('hot');
+            $dropdown.trigger('change');
         }, 1);
     });
 
