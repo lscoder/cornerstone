@@ -34,8 +34,6 @@
             enabledElement.syncViewports = true;
         }
 
-        enabledElement.layers = enabledElement.layers || [];
-
         var layerEnabledElement = {
             image: image,
             layerId: layerId,

@@ -12,15 +12,11 @@
     function updateImage(element, invalidated) {
         var enabledElement = cornerstone.getEnabledElement(element);
 
-        if (enabledElement.layers) {
-            cornerstone.drawCompositeImage(enabledElement, invalidated);
-        } else {
-            if(enabledElement.image === undefined) {
-                throw "updateImage: image has not been loaded yet";
-            }
-            
-            cornerstone.drawImage(enabledElement, invalidated);    
+        if(!enabledElement.image && !enabledElement.layers) {
+            throw "updateImage: image has not been loaded yet";
         }
+
+        cornerstone.drawImage(enabledElement, invalidated);
     }
 
     // module exports

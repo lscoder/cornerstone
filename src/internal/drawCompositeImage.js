@@ -144,28 +144,7 @@
      * @param invalidated - true if pixel data has been invalidated and cached rendering should not be used
      */
     function drawCompositeImage(enabledElement, invalidated) {
-
-        var start = new Date();
-
         renderCompositeImage(enabledElement, invalidated);
-
-        var context = enabledElement.canvas.getContext('2d');
-
-        var end = new Date();
-        var diff = end - start;
-        //console.log(diff + ' ms');
-
-        var eventData = {
-            viewport : enabledElement.viewport,
-            element : enabledElement.element,
-            layers : enabledElement.layers,
-            enabledElement : enabledElement,
-            canvasContext: context,
-            renderTimeInMs : diff
-        };
-
-        $(enabledElement.element).trigger("CornerstoneImageRendered", eventData);
-        enabledElement.invalid = false;
     }
 
     // Module exports

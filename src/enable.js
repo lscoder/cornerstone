@@ -18,7 +18,8 @@
             canvas: canvas,
             image : undefined, // will be set once image is loaded
             invalid: false, // true if image needs to be drawn, false if not
-            needsRedraw:true,
+            needsRedraw: true,
+            layers: [],
             data : {}
         };
         cornerstone.addEnabledElement(el);
@@ -30,26 +31,10 @@
             if (el.canvas === undefined){
                 return;
             }
-            if (el.needsRedraw && el.image !== undefined){
-                var start = new Date();
 
-                cornerstone.renderImage(el);
+            if (el.needsRedraw) {
+                cornerstone.renderImage(el, el.invalid);
 
-                var context = el.canvas.getContext('2d');
-
-                var end = new Date();
-                var diff = end - start;
-
-                var eventData = {
-                    viewport: el.viewport,
-                    element: el.element,
-                    image: el.image,
-                    enabledElement: el,
-                    canvasContext: context,
-                    renderTimeInMs: diff
-                };
-
-                $(el.element).trigger("CornerstoneImageRendered", eventData);
                 el.invalid = false;
                 el.needsRedraw = false;
             }
