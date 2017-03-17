@@ -58,6 +58,7 @@
         }
 
         image.rgba = true;
+        image.lut = undefined;
         image.minPixelValue = 0;
         image.maxPixelValue = 255;
         image.windowWidth = 255;

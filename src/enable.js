@@ -32,7 +32,8 @@
             }
             if (el.needsRedraw && el.image !== undefined){
                 var start = new Date();
-                el.image.render(el, el.invalid);
+
+                cornerstone.renderImage(el);
 
                 var context = el.canvas.getContext('2d');
 
