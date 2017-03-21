@@ -24,10 +24,23 @@
         return found;
     }
 
+    function triggerEvent(eventName, enabledElement, layerId) {
+        var element = enabledElement.element;
+        var eventData = {
+            viewport : enabledElement.viewport,
+            element : enabledElement.element,
+            image : enabledElement.image,
+            enabledElement : enabledElement,
+            layerId: layerId
+        };
+
+        $(element).trigger(eventName, eventData);
+    }
+
     function addLayer(element, image, options) {
-        var enabledElement = cornerstone.getEnabledElement(element);
-        
         var layerId = guid();
+        var enabledElement = cornerstone.getEnabledElement(element);
+        var layers = enabledElement.layers;
 
         // Set syncViewports to true by default when a new layer is added
         if (enabledElement.syncViewports === undefined) {
@@ -40,7 +53,13 @@
             options: options || {}
         };
 
-        enabledElement.layers.push(layerEnabledElement);
+        layers.push(layerEnabledElement);
+
+        if(layers.length === 1) {
+            setActiveLayer(element, layers[0].layerId);
+        }
+
+        triggerEvent('CornerstoneLayerAdded', enabledElement, layerId);
 
         console.log('Layer added: ' + layerId);
         return layerId;
@@ -48,10 +67,18 @@
 
     function removeLayer(element, layerId) {
         var enabledElement = cornerstone.getEnabledElement(element);
+        var layers = enabledElement.layers;
         var index = indexOfInObjectArray(enabledElement.layers, 'layerId', layerId);
+
         if (index !== -1) {
-            enabledElement.layers.splice(index, 1);
+            layers.splice(index, 1);
             console.log('Layer removed: ' + layerId);
+
+            if((layerId === enabledElement.activeLayerId) && layers.length) {
+                setActiveLayer(element, layers[0].layerId);
+            }
+
+            triggerEvent('CornerstoneLayerRemoved', enabledElement, layerId);
         }
     }
 
@@ -69,9 +96,32 @@
         return enabledElement.layers;
     }
 
+    function setActiveLayer(element, layerId) {
+        var enabledElement = cornerstone.getEnabledElement(element);
+        var index = indexOfInObjectArray(enabledElement.layers, 'layerId', layerId);
+
+        if ((index === -1) || (enabledElement.activeLayerId === layerId)) {
+            return;
+        }
+
+        enabledElement.activeLayerId = layerId;
+        triggerEvent('CornerstoneActiveLayerChanged', enabledElement, layerId);
+    }
+
+    function getActiveLayer(element, layerId) {
+        var enabledElement = cornerstone.getEnabledElement(element);
+        var index = indexOfInObjectArray(enabledElement.layers, 'layerId', enabledElement.activeLayerId);
+
+        if(index !== -1) {
+            return enabledElement.layers[index];
+        }
+    }
+
     // module/private exports
     cornerstone.addLayer = addLayer;
     cornerstone.removeLayer = removeLayer;
     cornerstone.getLayers = getLayers;
+    cornerstone.setActiveLayer = setActiveLayer;
+    cornerstone.getActiveLayer = getActiveLayer;
 
 }(cornerstone));
