@@ -75,7 +75,7 @@
             viewportRatio[baseLayer.layerId] = 1;
             visibleLayers.forEach(function(layer, index) {
                 // Don't do anything to the base layer
-                if (index === 0) {
+                if (layer === baseLayer) {
                     return;
                 }
 
