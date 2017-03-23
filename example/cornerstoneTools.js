@@ -8918,6 +8918,483 @@ Display scroll progress bar across bottom of image.
  
 // End Source; src/stackTools/scrollIndicator.js
 
+// Begin Source: src/stackTools/multiLayerStackPrefetch.js
+(function($, cornerstone, cornerstoneTools) {
+
+    'use strict';
+
+    var toolType = 'multiLayerStackPrefetch';
+    var requestType = 'prefetch';
+
+    var configuration = {};
+
+    var resetPrefetchTimeout,
+        resetPrefetchDelay = 300;
+
+    function sortNumber(a, b) {
+        return a - b;
+    }
+
+    function range(lowEnd, highEnd) {
+        // Javascript version of Python's range function
+        // http://stackoverflow.com/questions/3895478/does-javascript-have-a-method-like-range-to-generate-an-array-based-on-suppl
+        lowEnd = Math.round(lowEnd) || 0;
+        highEnd = Math.round(highEnd) || 0;
+
+        var arr = [],
+            c = highEnd - lowEnd + 1;
+
+        if (c <= 0) {
+            return arr;
+        }
+
+        while ( c-- ) {
+            arr[c] = highEnd--;
+        }
+
+        return arr;
+    }
+
+    var max = function(arr) {
+        return Math.max.apply(null, arr);
+    };
+
+    var min = function(arr) {
+        return Math.min.apply(null, arr);
+    };
+
+    function nearestIndex(arr, x) {
+        // Return index of nearest values in array
+        // http://stackoverflow.com/questions/25854212/return-index-of-nearest-values-in-an-array
+        var l = [],
+            h = [];
+
+        arr.forEach(function(v) {
+            if (v < x) {
+                l.push(v);
+            } else if (v > x) {
+                h.push(v);
+            }
+        });
+
+        return {
+            low: arr.indexOf(max(l)),
+            high: arr.indexOf(min(h))
+        };
+    }
+
+    function getLayerStack(layer) {
+        var options = layer && layer.options ? layer.options : {};
+        return options.stack;
+    }
+
+    function isStackEmpty(stack) {
+        return !(stack && stack.imageIds && stack.imageIds.length);
+    }
+
+    function getLayersToPrefetch(enabledElement) {
+        var layers = enabledElement.layers;
+        var layersToPrefetch = [];
+
+        for(var i = 0; i < layers.length; i++) {
+            var layer = layers[i];
+            var stack = getLayerStack(layer);
+
+            if(isStackEmpty(stack) || stack.preventCache) {
+                continue;
+            }
+
+            var indicesToRequest = range(0, stack.imageIds.length - 1);
+
+            // Remove the currentImageIdIndex from the list to request
+            var indexOfCurrentImage = indicesToRequest.indexOf(stack.currentImageIdIndex);
+            indicesToRequest.splice(indexOfCurrentImage, 1);
+
+            layersToPrefetch.push({
+                layerId: layer.layerId,
+                indicesToRequest: indicesToRequest
+            });
+        }
+
+        return layersToPrefetch;
+    }
+
+    function hasCacheableLayer(enabledElement) {
+        var layers = enabledElement.layers;
+
+        // Check if we are allowed to cache images in some layer
+        for(var i = 0; i < layers.length; i++) {
+            var currentLayer = layers[i];
+            var layerStack = getLayerStack(currentLayer);
+
+            if(layerStack && !layerStack.preventCache) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function hasLayerWithIndexToRequest(stackPrefetch) {
+        var layersToPrefetch = stackPrefetch.layersToPrefetch;
+
+        for(var i = 0; i < layersToPrefetch.length; i++) {
+            var layerToPrefetch = layersToPrefetch[i];
+            if(layerToPrefetch.indicesToRequest && layerToPrefetch.indicesToRequest.length) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // Remove an imageIdIndex from the list of indices to request for a given layer
+    // This fires when the individual image loading deferred is resolved
+    function removeFromList(layerId, imageIdIndex, stackPrefetch) {
+        var layersToPrefetch = stackPrefetch.layersToPrefetch;
+        var layerToPrefetch;
+
+        for(var i = 0; i < layersToPrefetch.length; i++) {
+            if(layersToPrefetch[i].layerId === layerId) {
+                layerToPrefetch = layersToPrefetch[i];
+                break;
+            }
+        }
+
+        if(!layerToPrefetch) {
+            return;
+        }
+
+        var index = layerToPrefetch.indicesToRequest.indexOf(imageIdIndex);
+        if (index > -1) {
+            layerToPrefetch.indicesToRequest.splice(index, 1);
+        }
+    }
+
+    function removeResolvedPromises(element, stackPrefetch) {
+        var layersToPrefetch = stackPrefetch.layersToPrefetch;
+
+        for(var i = 0; i < layersToPrefetch.length; i++) {
+            var layerToPrefetch = layersToPrefetch[i];
+            var layer = cornerstone.getLayerById(element, layerToPrefetch.layerId);
+
+            layerToPrefetch.indicesToRequest.sort(sortNumber);
+
+            // Remove all already cached images from the indicesToRequest array
+            layerToPrefetch.indicesToRequest.forEach(function(imageIdIndex) {
+                var imageId = layer.options.stack.imageIds[imageIdIndex];
+
+                if (!imageId) {
+                    return;
+                }
+
+                var imagePromise = cornerstone.imageCache.getImagePromise(imageId);
+                if (imagePromise && imagePromise.state() === 'resolved'){
+                    removeFromList(layer.layerId, imageIdIndex, stackPrefetch);
+                }
+            });
+        }
+    }
+
+    function getLayersNearest(element, stackPrefetch) {
+        var layersToPrefetch = stackPrefetch.layersToPrefetch;
+        var layersNearest = {};
+
+        for(var i = 0; i < layersToPrefetch.length; i++) {
+            var layerToPrefetch = layersToPrefetch[i];
+            var layer = cornerstone.getLayerById(element, layerToPrefetch.layerId);
+            var stack = getLayerStack(layer);
+
+            // Identify the nearest imageIdIndex to the currentImageIdIndex
+            var nearest = nearestIndex(layerToPrefetch.indicesToRequest, stack.currentImageIdIndex);
+            layersNearest[layer.layerId] = nearest;
+        }
+
+        return layersNearest;
+    }
+
+    function addRequestsToRequestPoolManager(element, stackPrefetch, layersNearest) {
+        var i, j;
+        var layersToPrefetch = stackPrefetch.layersToPrefetch;
+        var imageIdsIndicesLists = [];
+        var maxImageIdsLength = 0;
+        var preventCache = false;
+        var requestPoolManager = cornerstoneTools.requestPoolManager;
+
+        function getDoneCallback(layer) {
+            return function(image) {
+                var stack = getLayerStack(layer);
+
+                if(isStackEmpty(stack)) {
+                    return;
+                }
+
+                var imageIdIndex = stack.imageIds.indexOf(image.imageId);
+                removeFromList(layer.layerId, imageIdIndex, stackPrefetch);
+            }
+        }
+
+        function getFailCallback(imageId) {
+            // Retrieve the errorLoadingHandler if one exists
+            var errorLoadingHandler = cornerstoneTools.loadHandlerManager.getErrorLoadingHandler();
+
+            return function failCallback(error) {
+                console.log('Prefetch failed: ' + error);
+                if (errorLoadingHandler) {
+                    errorLoadingHandler(imageId, error, 'multiLayerStackPrefetch');
+                }
+            }
+        }
+
+        // Retrieve the errorLoadingHandler if one exists
+        for(i = 0; i < layersToPrefetch.length; i++) {
+            var layerToPrefetch = layersToPrefetch[i];
+            var layerId = layerToPrefetch.layerId;
+            var nearest = layersNearest[layerId];
+            var imageIdsIndices = getImageIdIndicesByNearest(layerToPrefetch.indicesToRequest, nearest);
+
+            imageIdsIndicesLists.push({
+                layerId: layerId,
+                imageIdsIndices: imageIdsIndices
+            });
+
+            maxImageIdsLength = Math.max(maxImageIdsLength, imageIdsIndices.length);
+        }
+
+        for(i = 0; i < maxImageIdsLength; i++) {
+            for(j = 0; j < imageIdsIndicesLists.length; j++) {
+                var imageIdsIndicesList = imageIdsIndicesLists[j];
+                var layerId = imageIdsIndicesList.layerId;
+                var imageIdsIndices = imageIdsIndicesList.imageIdsIndices;
+
+                if(i < imageIdsIndices.length) {
+                    var layer = cornerstone.getLayerById(element, layerId);
+                    var stack = getLayerStack(layer);
+                    var imageIdIndex = imageIdsIndices[i];
+                    var imageId = stack.imageIds[imageIdIndex];
+                    var doneCallback = getDoneCallback(layer);
+                    var failCallback = getFailCallback(imageId);
+
+                    requestPoolManager.addRequest(element, imageId, requestType, preventCache, doneCallback, failCallback);
+                }
+            }
+        }
+    }
+
+    function getImageIdIndicesByNearest(indicesToRequest, nearest) {
+        var indices = [];
+        var lowerIndex = nearest.low;
+        var higherIndex = nearest.high;
+
+        while (lowerIndex >= 0 || higherIndex < indicesToRequest.length) {
+            if (lowerIndex >= 0 ) {
+                indices.push(indicesToRequest[lowerIndex--]);
+            }
+
+            if (higherIndex < indicesToRequest.length) {
+                indices.push(indicesToRequest[higherIndex++]);
+            }
+        }
+
+        return indices;
+    }
+
+    function prefetch(element) {
+        var enabledElement = cornerstone.getEnabledElement(element);
+        var requestPoolManager = cornerstoneTools.requestPoolManager;
+
+        if (!hasCacheableLayer(enabledElement)) {
+            return;
+        }
+
+        // Get the stackPrefetch tool data
+        var stackPrefetchData = cornerstoneTools.getToolState(element, toolType);
+        if (!stackPrefetchData) {
+            return;
+        }
+
+        var stackPrefetch = stackPrefetchData.data[0];
+
+        // If all the requests are complete, disable the stackPrefetch tool
+        if (!stackPrefetch || !hasLayerWithIndexToRequest(stackPrefetch)) {
+            stackPrefetch.enabled = false;
+        }
+
+        // Make sure the tool is still enabled
+        if (stackPrefetch.enabled === false) {
+            return;
+        }
+
+        removeResolvedPromises(element, stackPrefetch);
+
+        // Stop here if there are no images left to request
+        if (!hasLayerWithIndexToRequest(stackPrefetch)) {
+            return;
+        }
+
+        // Clear the requestPool of prefetch requests
+        requestPoolManager.clearRequestStack(requestType);
+        var layersNearest = getLayersNearest(element, stackPrefetch);
+
+        addRequestsToRequestPoolManager(element, stackPrefetch, layersNearest);
+
+        // Try to start the requestPool's grabbing procedure
+        // in case it isn't already running
+        requestPoolManager.startGrabbing();
+    }
+
+    function handleCacheFull(e) {
+        // Stop prefetching if the ImageCacheFull event is fired from cornerstone
+        // console.log('CornerstoneImageCacheFull full, stopping');
+        var element = e.data.element;
+
+        var stackPrefetchData = cornerstoneTools.getToolState(element, toolType);
+        if (!stackPrefetchData || !stackPrefetchData.data || !stackPrefetchData.data.length) {
+            return;
+        }
+
+        // Clear current prefetch requests from the requestPool
+        cornerstoneTools.requestPoolManager.clearRequestStack(requestType);
+    }
+
+    function promiseRemovedHandler(e, eventData) {
+        // When an imagePromise has been pushed out of the cache, re-add its index
+        // it to the indicesToRequest list so that it will be retrieved later if the
+        // currentImageIdIndex is changed to an image nearby
+        var element = e.data.element;
+        var enabledElement = cornerstone.getEnabledElement(element);
+        var layers = enabledElement.layers;
+        var layersAffected = [];
+
+        if (!hasCacheableLayer(enabledElement)) {
+            return;
+        }
+
+        layers.forEach(function (layer) {
+            var stack = getLayerStack(layer);
+            var imageIdIndex = stack.imageIds.indexOf(eventData.imageId);
+
+            if(stack && (imageIdIndex !== -1)) {
+                layersAffected.push({
+                    layerId: layer.layerId,
+                    imageIdIndex: imageIdIndex
+                });
+            }
+        });
+
+        if(!layersAffected.length) {
+            return;
+        }
+
+        var stackPrefetchData = cornerstoneTools.getToolState(element, toolType);
+        if (!stackPrefetchData || !stackPrefetchData.data || !stackPrefetchData.data.length) {
+            return;
+        }
+
+        var stackPrefetch = stackPrefetchData.data[0];
+
+        layersAffected.forEach(function (layerAffected) {
+            var stackPrefetchLayer;
+
+            stackPrefetch.layersToPrefetch.forEach(function(layerToPrefetch) {
+                if(layerToPrefetch.layerId === layerAffected.layerId) {
+                    layerToPrefetch.indicesToRequest.push(layerAffected.imageIdIndex);
+                }
+            })
+        });
+    }
+
+    function onImageUpdated(e) {
+        // Start prefetching again (after a delay)
+        // When the user has scrolled to a new image
+        clearTimeout(resetPrefetchTimeout);
+        resetPrefetchTimeout = setTimeout(function() {
+            var element = e.target;
+
+            // If playClip is enabled and the user loads a different series in the viewport
+            // an exception will be thrown because the element will not be enabled anymore
+            try {
+                prefetch(element);
+            } catch(error) {
+                return;
+            }
+
+        }, resetPrefetchDelay);
+    }
+
+    function enable(element) {
+        var enabledElement = cornerstone.getEnabledElement(element);
+
+        // Clear old prefetch data. Skipping this can cause problems when changing the series inside an element
+        var stackPrefetchDataArray = cornerstoneTools.getToolState(element, toolType);
+        stackPrefetchDataArray.data = [];
+
+        var layersToPrefetch = getLayersToPrefetch(enabledElement);
+
+        if (!layersToPrefetch.length) {
+            console.warn('There is no cacheable stack to be prefetched');
+            return;
+        }
+
+        var stackPrefetchData = {
+            layersToPrefetch: getLayersToPrefetch(enabledElement),
+            enabled: true
+        };
+
+        cornerstoneTools.addToolState(element, toolType, stackPrefetchData);
+
+        prefetch(element);
+
+        $(element).off('CornerstoneNewImage', onImageUpdated);
+        $(element).on('CornerstoneNewImage', onImageUpdated);
+
+        $(cornerstone).off('CornerstoneImageCacheFull', handleCacheFull);
+        $(cornerstone).on('CornerstoneImageCacheFull', {
+            element: element
+        }, handleCacheFull);
+
+        $(cornerstone).off('CornerstoneImageCachePromiseRemoved', promiseRemovedHandler);
+        $(cornerstone).on('CornerstoneImageCachePromiseRemoved', {
+            element: element
+        }, promiseRemovedHandler);
+    }
+
+    function disable(element) {
+        clearTimeout(resetPrefetchTimeout);
+        $(element).off('CornerstoneNewImage', onImageUpdated);
+
+        $(cornerstone).off('CornerstoneImageCacheFull', handleCacheFull);
+        $(cornerstone).off('CornerstoneImageCachePromiseRemoved', promiseRemovedHandler);
+
+        var stackPrefetchData = cornerstoneTools.getToolState(element, toolType);
+        // If there is actually something to disable, disable it
+        if (stackPrefetchData && stackPrefetchData.data.length) {
+            stackPrefetchData.data[0].enabled = false;
+
+            // Clear current prefetch requests from the requestPool
+            cornerstoneTools.requestPoolManager.clearRequestStack(requestType);
+        }
+    }
+
+    function getConfiguration() {
+        return configuration;
+    }
+
+    function setConfiguration(config) {
+        configuration = config;
+    }
+
+    // module/private exports
+    cornerstoneTools.multiLayerStackPrefetch = {
+        enable: enable,
+        disable: disable,
+        getConfiguration: getConfiguration,
+        setConfiguration: setConfiguration
+    };
+
+})($, cornerstone, cornerstoneTools);
+// End Source; src/stackTools/multiLayerStackPrefetch.js
+
 // Begin Source: src/stackTools/stackPrefetch.js
 (function($, cornerstone, cornerstoneTools) {
 
@@ -9780,7 +10257,7 @@ Display scroll progress bar across bottom of image.
             oldStateManager = cornerstoneTools.globalImageIdSpecificToolStateManager;
         }
 
-        var stackTools = [ 'stack', 'stackPrefetch', 'playClip', 'volume', 'slab', 'referenceLines', 'crosshairs' ];
+        var stackTools = [ 'stack', 'stackPrefetch', 'multiLayerStackPrefetch', 'playClip', 'volume', 'slab', 'referenceLines', 'crosshairs' ];
         var stackSpecificStateManager = cornerstoneTools.newStackSpecificToolStateManager(stackTools, oldStateManager);
         stackStateManagers.push(stackSpecificStateManager);
         cornerstoneTools.setElementToolStateManager(element, stackSpecificStateManager);
@@ -11964,7 +12441,9 @@ Display scroll progress bar across bottom of image.
         }
 
         var eventData = {
+            element: element,
             newImageIdIndex: newImageIdIndex,
+            stackLength: stackData.imageIds.length,
             direction: newImageIdIndex - stackData.currentImageIdIndex
         };
 

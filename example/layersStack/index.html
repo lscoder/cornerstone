@@ -12,10 +12,10 @@
 <div class="container">
 
     <h1>
-        layers/index.html
+        layersStack/index.html
     </h1>
 
-    Layers Example
+    Layers (Stack) Example
 
     
     <div class="row">
@@ -46,7 +46,7 @@
                 <label>Properties</label>
                 <div style="width: 100%; padding: 5px 5px 5px 10px;">
                     <div style="margin-bottom: 15px;">
-                        <label for="visible"> Visible</label><br>
+                        <label for="imageOpacity"> Visible</label><br>
                         <input name="visible" type="radio" value="1"> Yes &nbsp;&nbsp;
                         <input name="visible" type="radio" value="0"> No
                     </div>
@@ -75,16 +75,27 @@
 <!-- include special code for these examples which provides images -->
 <script src="../exampleImageIdLoaderCt.js"></script>
 <script src="../exampleImageIdLoader.js"></script>
-<script src="../exampleMetaDataProvider.js"></script>
 
 <script>
 
     $(document).ready(function() {
+        var i;
+
         // image enable the dicomImage element
         var element = $('#dicomImage').get(0);
         cornerstone.enable(element);
 
         var host = window.location.href.replace('/index.html','');
+        var firstLayerStack = [];
+        var secondLayerStack = [];
+
+        for(i = 0; i < 10; i++) {
+            firstLayerStack.push('dicomweb:' + host + '/echo.dcm?frame=' + i);
+        }
+
+        for(i = 0; i < 200; i++) {
+            secondLayerStack.push('dicomweb:' + host + '/numbers.dcm?frame=' + i);
+        }
 
         // Load and display the image
         // 
@@ -92,79 +103,32 @@
         // Cornerstone doesn't know that it exists.
         //
         var layers = [
-            // {
-            //     imageId: 'dicomweb:' + host + '/object-78.dcm',
-            //     options: {
-            //         name: 'object-78.dcm'
-            //     }
-            // },
-            // {
-            //     imageId: 'dicomweb:' + host + '/object.SEG.dcm?frame=78',
-            //     options: {
-            //         name: 'object.SEG.dcm',
-            //         opacity: 0.5
-            //     }
-            // }
-            // {
-            //     imageId: 'dicomweb:' + host + '/ct.dcm',
-            //     options: {
-            //         name: 'CT',
-            //     }
-            // },
-            // {
-            //     imageId: 'dicomweb:' + host + '/pet.dcm',
-            //     options: {
-            //         name: 'PET',
-            //     }
-            // },
             {
-                imageId: 'example://1',
                 options: {
-                    name: 'Example 1'
+                    name: 'First Layer',
+                    stack: {
+                        currentImageIdIndex: 0,
+                        imageIds: firstLayerStack
+                    }
                 }
             },
-            // {
-            //     imageId: 'example://2',
-            //     options: {
-            //         name: 'Example 2'
-            //     }
-            // },
-            // {
-            //     imageId: 'ctexample://1',
-            //     options: {
-            //         name: 'CT Example'
-            //     }
-            // },
             {
-                imageId: 'dicomweb:' + host + '/color.dcm',
                 options: {
-                    name: 'Color image'
+                    name: 'Second Layer',
+                    stack: {
+                        currentImageIdIndex: 0,
+                        imageIds: secondLayerStack
+                    }
                 }
             }
         ];
-
-        var orientationMarkersConfig = {
-            drawAllMarkers: true
-        }
-
-        var textMarkerConfig = {
-            'markers' : ['L5', 'L4', 'L3', 'L2', 'L1', // Lumbar spine
-                         'T12', 'T11', 'T10', 'T9', 'T8', 'T7', // Thoracic spine
-                         'T6', 'T5', 'T4', 'T3', 'T2', 'T1',
-                         'C7', 'C6', 'C5', 'C4', 'C3', 'C2', 'C1', // Cervical spine
-                         ],
-            'current': 'C7',
-            'ascending': true,
-            'loop': true,
-            'changeTextCallback': function(data, eventData, callback) {
-                callback(data, data.text + '.');
-            }
-        }
 
         function loadLayers() {
             loadImages().then(function() {
                 var images = Array.prototype.slice.call(arguments);
                 
+                cornerstoneTools.addStackStateManager(element, ['stack']);
+
                 images.forEach(function(image, index) {
                     var layer = layers[index];
                     var layerId = cornerstone.addLayer(element, image, layer.options);
@@ -173,11 +137,26 @@
                     console.log('Layer ' + index + ': ' + layerId);
                 });
 
+                // Enable all tools we want to use with this element
+                cornerstoneTools.stackScroll.activate(element, 1);
+                cornerstoneTools.stackScrollWheel.activate(element);
+                cornerstoneTools.scrollIndicator.enable(element);
+                cornerstoneTools.multiLayerStackPrefetch.enable(element);
+
+
                 // Update dropdown size to make all layers name visible
                 $('#layers').prop('size', layers.length);
 
                 // Enable cornerstone tools
                 enableTools();
+
+                // Test Code
+                var enabledElement = cornerstone.getEnabledElement(element);
+                var lastLayer = enabledElement.layers[enabledElement.layers.length - 1];
+
+                lastLayer.viewport.scale = 4;
+                lastLayer.viewport.translation.y += 50;
+                lastLayer.viewport.translation.x += 35;
             });
         }
 
@@ -185,7 +164,7 @@
             var promises = [];
 
             layers.forEach(function(layer) {
-                var loadPromise = cornerstone.loadImage(layer.imageId);
+                var loadPromise = cornerstone.loadImage(layer.options.stack.imageIds[0]);
                 promises.push(loadPromise);
             });
 
@@ -195,34 +174,12 @@
         function enableTools() {
             cornerstoneTools.mouseInput.enable(element);
             cornerstoneTools.mouseWheelInput.enable(element);
-            cornerstoneTools.magnify.enable(element);
-            cornerstoneTools.orientationMarkers.enable(element);
-            // cornerstoneTools.arrowAnnotate.setConfiguration(arrowAnnotateConfig);
-            // cornerstoneTools.seedAnnotate.setConfiguration(seedAnnotateConfig);
-            cornerstoneTools.orientationMarkers.setConfiguration(orientationMarkersConfig);
 
             // Enable all tools we want to use with this element
-            // cornerstoneTools.wwwc.activate(element, 1); // ww/wc is the default tool for left mouse button
-            // cornerstoneTools.probe.activate(element, 1);
-            // cornerstoneTools.dragProbe.activate(element, 1);
-            // cornerstoneTools.simpleAngle.activate(element, 1);
-            // cornerstoneTools.arrowAnnotate.activate(element, 1);
-            // cornerstoneTools.length.activate(element, 1);
-            // cornerstoneTools.freehand.activate(element, 1);
-            // cornerstoneTools.highlight.activate(element, 1);
-            // cornerstoneTools.magnify.activate(element, 1);
-
-            // cornerstoneTools.orientationMarkers.enable(element);
-            // cornerstoneTools.seedAnnotate.activate(element, 1);
-            // cornerstoneTools.textMarker.enable(element);
-            // cornerstoneTools.textMarker.setConfiguration(textMarkerConfig);
-            // cornerstoneTools.textMarker.activate(element, 1);
-            // cornerstoneTools.wwwcRegion.activate(element, 1);
-
-            cornerstoneTools.rotate.activate(element, 1);
+            cornerstoneTools.wwwc.activate(element, 1); // ww/wc is the default tool for left mouse button
             cornerstoneTools.pan.activate(element, 2); // pan is the default tool for middle mouse button
             cornerstoneTools.zoom.activate(element, 4); // zoom is the default tool for right mouse button
-            cornerstoneTools.zoomWheel.activate(element); // zoom is the default tool for middle mouse wheel
+            // cornerstoneTools.zoomWheel.activate(element); // zoom is the default tool for middle mouse wheel
         }
 
         $("#layers").change(function(event) {

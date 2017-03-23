@@ -12,6 +12,17 @@
             });
     }
 
+    function cloneViewport(viewport) {
+        return {
+            rotation: viewport.rotation,
+            scale: viewport.scale,
+            translation: {
+                x: viewport.translation.x,
+                y: viewport.translation.y
+            }
+        }
+    }
+
     function getDrawImageOffset(targetImageId, referenceImageId) {
         var offset = {
             x: 0,
@@ -46,6 +57,8 @@
 
     // This is used to keep each of the layers' viewports in sync with the base layer
     var viewportRatio = {};
+    var syncedViewports = {};
+    var lastSyncViewportsStatus;
 
     /**
      * Internal API function to draw to an enabled element
@@ -53,8 +66,6 @@
      * @param invalidated - true if pixel data has been invalidated and cached rendering should not be used
      */
     function renderCompositeImage(enabledElement, invalidated) {
-        // Calculate the base layer's default viewport parameters if they don't already exist
-        // and store them
         var baseLayer = enabledElement.layers.filter(function(layer) {
             return layer.viewport === enabledElement.viewport;
         })[0];
@@ -71,36 +82,56 @@
             }
         });
 
+        var updateViewportRatio = !lastSyncViewportsStatus && enabledElement.syncViewports;
+        lastSyncViewportsStatus = enabledElement.syncViewports;
+
         // If we intend to keep the viewport's scale and translation in sync,
         // loop through the layers 
-        if (enabledElement.syncViewports === true) {
-            viewportRatio[baseLayer.layerId] = 1;
-            visibleLayers.forEach(function(layer, index) {
-                // Don't do anything to the base layer
-                if (layer === baseLayer) {
-                    return;
-                }
+        // if (enabledElement.syncViewports === true) {
+        //     console.log('>>>> updateViewportRatio');
+        //     viewportRatio[baseLayer.layerId] = 1;
 
-                // If no viewport has been set yet for this layer, calculate the default viewport
-                // parameters
-                // if (!layer.viewport) {
-                //     layer.viewport = cornerstone.internal.getDefaultViewport(enabledElement.canvas, layer.image);
-                //     viewportRatio[layer.layerId] = layer.viewport.scale / baseLayer.viewport.scale;   
-                // }
-                if (!viewportRatio[layer.layerId]) {
-                    viewportRatio[layer.layerId] = layer.viewport.scale / baseLayer.viewport.scale;   
-                }
+        //     if(updateViewportRatio) {
+        //         // syncedViewports[baseLayer.layerId] = cloneViewport(baseLayer.viewport);
+        //     }
 
-                // Update the layer's translation and scale to keep them in sync with the first image
-                // based on the stored ratios between the images
-                layer.viewport.scale = baseLayer.viewport.scale * viewportRatio[layer.layerId];
-                layer.viewport.rotation = baseLayer.viewport.rotation;
-                layer.viewport.translation = {
-                    x: baseLayer.viewport.translation.x * layer.image.width / baseLayer.image.width,
-                    y: baseLayer.viewport.translation.y * layer.image.height / baseLayer.image.height
-                };
-            });    
-        }
+        //     visibleLayers.forEach(function(layer, index) {
+
+        //         // Don't do anything to the base layer
+        //         if (layer === baseLayer) {
+        //             return;
+        //         }
+
+        //         // const viewportRatio = layer.viewport.scale / baseLayer.viewport.scale;
+
+        //         // If no viewport has been set yet for this layer, calculate the default viewport
+        //         // parameters
+        //         // if (!layer.viewport) {
+        //         //     layer.viewport = cornerstone.internal.getDefaultViewport(enabledElement.canvas, layer.image);
+        //         //     viewportRatio[layer.layerId] = layer.viewport.scale / baseLayer.viewport.scale;   
+        //         // }
+        //         if (updateViewportRatio) {
+        //             viewportRatio[layer.layerId] = layer.viewport.scale / baseLayer.viewport.scale;
+        //             // syncedViewports[layer.layerId] = cloneViewport(layer.viewport);
+        //         }
+
+        //         // Update the layer's translation and scale to keep them in sync with the first image
+        //         // based on the stored ratios between the images
+        //         layer.viewport.scale = baseLayer.viewport.scale * viewportRatio[layer.layerId];
+        //         layer.viewport.rotation = baseLayer.viewport.rotation;
+        //         layer.viewport.translation = {
+        //             x: baseLayer.viewport.translation.x / viewportRatio[layer.layerId], // * layer.image.width / baseLayer.image.width,
+        //             y: baseLayer.viewport.translation.y / viewportRatio[layer.layerId]  // * layer.image.height / baseLayer.image.height
+        //         };
+
+        //         console.log("Info:\n\t" +
+        //                     "Layer scale: " + layer.viewport.scale.toFixed(2) + "\n\t" +
+        //                     "Base layer scale: " + baseLayer.viewport.scale.toFixed(2) + "\n\t" +
+        //                     "Scale ratio: " + (layer.viewport.scale / baseLayer.viewport.scale).toFixed(2)  + "\n\t" +
+        //                     "Base layer X: " + baseLayer.viewport.translation.x.toFixed(2) + "\n\t" +
+        //                     "Layer X: " + ((layer.viewport.scale / baseLayer.viewport.scale) * baseLayer.viewport.translation.x).toFixed(2));
+        //     });    
+        // }
 
         // Get the enabled element's canvas so we can draw to it
         var context = enabledElement.canvas.getContext('2d');

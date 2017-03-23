@@ -61,6 +61,7 @@
             setActiveLayer(element, layers[0].layerId);
         }
 
+        attachEventHandlers(enabledElement);
         triggerEvent('CornerstoneLayerAdded', enabledElement, layerId);
 
         console.log('Layer added: ' + layerId);
@@ -84,17 +85,15 @@
         }
     }
 
-    function getLayers(element, layerId) {
+    function getLayerById(element, layerId) {
         var enabledElement = cornerstone.getEnabledElement(element);
-        
-        // If a layer ID is provided, return the details of that layer
-        if (layerId) {
-            var index = indexOfInObjectArray(enabledElement.layers, 'layerId', layerId);
-            if (index !== -1) {
-                return enabledElement.layers[index];
-            }
-        }
+        var index = indexOfInObjectArray(enabledElement.layers, 'layerId', layerId);
 
+        return enabledElement.layers[index];
+    }
+
+    function getLayers(element) {
+        var enabledElement = cornerstone.getEnabledElement(element);
         return enabledElement.layers;
     }
 
@@ -112,11 +111,16 @@
         enabledElement.image = layer.image;
         enabledElement.viewport = layer.viewport;
 
+        cornerstoneTools.clearToolState(element, 'stack');
+        if(layer.options.stack) {
+            cornerstoneTools.addToolState(element, 'stack', layer.options.stack);
+        }
+
         cornerstone.updateImage(element);
         triggerEvent('CornerstoneActiveLayerChanged', enabledElement, layerId);
     }
 
-    function getActiveLayer(element, layerId) {
+    function getActiveLayer(element) {
         var enabledElement = cornerstone.getEnabledElement(element);
         var index = indexOfInObjectArray(enabledElement.layers, 'layerId', enabledElement.activeLayerId);
 
@@ -125,10 +129,54 @@
         }
     }
 
+    function attachEventHandlers(enabledElement) {
+        $(enabledElement.element).off('CornerstoneStackScroll.Layers');
+
+        if(layers.length) {
+            $(enabledElement.element).on('CornerstoneStackScroll.Layers', onStackScroll);
+        }
+    }
+
+    function onStackScroll(event, eventData) {
+        var enabledElement = cornerstone.getEnabledElement(eventData.element);
+        var activeLayer = getActiveLayer(enabledElement.element);
+        var layers = enabledElement.layers;
+        var percent = eventData.newImageIdIndex / (eventData.stackLength - 1);
+
+        if(!Number.isFinite(percent)) {
+            percent = 0;
+        }
+
+        function getLoadImageSuccessHandler(layer) {
+            return function(image) {
+                layer.image = image;
+                cornerstone.updateImage(enabledElement.element);
+            };
+        }
+
+        for(var i = 0; i < layers.length; i++) {
+            var layer = layers[i];
+            var layerOptions = layer.options || {};
+            var stack = layerOptions.stack;
+
+            if((layers[i] === activeLayer) || !stack) {
+                continue;
+            }
+
+            var imageIds = stack.imageIds;
+            var imageIndex = Math.round((imageIds.length - 1) * percent);
+            var imageId = imageIds[imageIndex];
+            var successHandler = getLoadImageSuccessHandler(layer);
+
+            cornerstone.loadImage(imageId).then(successHandler);
+        }
+    }
+
     // module/private exports
     cornerstone.addLayer = addLayer;
     cornerstone.removeLayer = removeLayer;
     cornerstone.getLayers = getLayers;
+    cornerstone.getLayerById = getLayerById;
     cornerstone.setActiveLayer = setActiveLayer;
     cornerstone.getActiveLayer = getActiveLayer;
 
