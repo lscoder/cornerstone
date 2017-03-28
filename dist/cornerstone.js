@@ -1,10 +1,36 @@
-/*! cornerstone - v0.9.0 - 2016-02-03 | (c) 2014 Chris Hafey | https://github.com/chafey/cornerstone */
+/*! cornerstone - v0.10.3 - 2017-02-24 | (c) 2014 Chris Hafey | https://github.com/chafey/cornerstone */
 if(typeof cornerstone === 'undefined'){
     cornerstone = {
         internal : {},
         rendering: {}
     };
 }
+
+(function (cornerstone) {
+
+    "use strict";
+
+    /**
+     * Converts a point in the canvas coordinate system to the pixel coordinate system
+     * system.  This can be used to reset tools' image coordinates after modifications
+     * have been made in canvas space (e.g. moving a tool by a few cm, independent of 
+     * image resolution).
+     *
+     * @param element
+     * @param pt
+     * @returns {x: number, y: number}
+     */
+    function canvasToPixel(element, pt) {
+        var enabledElement = cornerstone.getEnabledElement(element);
+        var transform = cornerstone.internal.getTransform(enabledElement);
+        transform.invert();
+        return transform.transformPoint(pt.x, pt.y);
+    }
+
+    // module/private exports
+    cornerstone.canvasToPixel = canvasToPixel;
+
+}(cornerstone));
 
 (function (cornerstone) {
 
@@ -29,6 +55,7 @@ if(typeof cornerstone === 'undefined'){
 
                 // remove the child dom elements that we created (e.g.canvas)
                 enabledElements[i].element.removeChild(enabledElements[i].canvas);
+                enabledElements[i].canvas = undefined;
 
                 // remove this element from the list of enabled elements
                 enabledElements.splice(i, 1);
@@ -148,7 +175,7 @@ if(typeof cornerstone === 'undefined'){
         for(var i=0;i < enabledElements.length; i++) {
             var ee = enabledElements[i];
             if(ee.invalid === true) {
-                cornerstone.drawImage(ee);
+                cornerstone.drawImage(ee, true);
             }
         }
     }
@@ -156,6 +183,7 @@ if(typeof cornerstone === 'undefined'){
     // Module exports
     cornerstone.drawInvalidated = drawInvalidated;
 }($, cornerstone));
+
 /**
  * This module is responsible for enabling an element to display images with cornerstone
  */
@@ -176,11 +204,45 @@ if(typeof cornerstone === 'undefined'){
             canvas: canvas,
             image : undefined, // will be set once image is loaded
             invalid: false, // true if image needs to be drawn, false if not
+            needsRedraw:true,
             data : {}
         };
         cornerstone.addEnabledElement(el);
 
         cornerstone.resize(element, true);
+
+
+        function draw() {
+            if (el.canvas === undefined){
+                return;
+            }
+            if (el.needsRedraw && el.image !== undefined){
+                var start = new Date();
+                el.image.render(el, el.invalid);
+
+                var context = el.canvas.getContext('2d');
+
+                var end = new Date();
+                var diff = end - start;
+
+                var eventData = {
+                    viewport: el.viewport,
+                    element: el.element,
+                    image: el.image,
+                    enabledElement: el,
+                    canvasContext: context,
+                    renderTimeInMs: diff
+                };
+
+                $(el.element).trigger("CornerstoneImageRendered", eventData);
+                el.invalid = false;
+                el.needsRedraw = false;
+            }
+
+            cornerstone.requestAnimationFrame(draw);
+        }
+
+        draw();
 
         return element;
     }
@@ -549,6 +611,7 @@ if(typeof cornerstone === 'undefined'){
 
         imagePromise.then(function(image) {
             cachedImage.loaded = true;
+            cachedImage.image = image;
 
             if (image.sizeInBytes === undefined) {
                 throw "putImagePromise: image does not have sizeInBytes property or";
@@ -603,12 +666,12 @@ if(typeof cornerstone === 'undefined'){
 
         // If this is using a sharedCacheKey, decrement the cache size only
         // if it is the last imageId in the cache with this sharedCacheKey
-        if(cachedImages.sharedCacheKey) {
-          if(sharedCacheKeys[cachedImages.sharedCacheKey] === 1) {
+        if(cachedImage.sharedCacheKey) {
+          if(sharedCacheKeys[cachedImage.sharedCacheKey] === 1) {
             cacheSizeInBytes -= cachedImage.sizeInBytes;
-            delete sharedCacheKeys[cachedImages.sharedCacheKey];
+            delete sharedCacheKeys[cachedImage.sharedCacheKey];
           } else {
-            sharedCacheKeys[cachedImages.sharedCacheKey]--;
+            sharedCacheKeys[cachedImage.sharedCacheKey]--;
           }
         } else {
           cacheSizeInBytes -= cachedImage.sizeInBytes;
@@ -668,6 +731,7 @@ if(typeof cornerstone === 'undefined'){
         getCacheInfo : getCacheInfo,
         purgeCache: purgeCache,
         cachedImages: cachedImages,
+        imageCache: imageCache,
         changeImageIdCacheSize: changeImageIdCacheSize
     };
 
@@ -685,7 +749,7 @@ if(typeof cornerstone === 'undefined'){
 
     var unknownImageLoader;
 
-    function loadImageFromImageLoader(imageId) {
+    function loadImageFromImageLoader(imageId, options) {
         var colonIndex = imageId.indexOf(":");
         var scheme = imageId.substring(0, colonIndex);
         var loader = imageLoaders[scheme];
@@ -699,7 +763,7 @@ if(typeof cornerstone === 'undefined'){
                 return undefined;
             }
         }
-        imagePromise = loader(imageId);
+        imagePromise = loader(imageId, options);
 
         // broadcast an image loaded event once the image is loaded
         // This is based on the idea here: http://stackoverflow.com/questions/3279809/global-custom-events-in-jquery
@@ -710,10 +774,10 @@ if(typeof cornerstone === 'undefined'){
         return imagePromise;
     }
 
-    // Loads an image given an imageId and returns a promise which will resolve
+    // Loads an image given an imageId and optional priority and returns a promise which will resolve
     // to the loaded image object or fail if an error occurred.  The loaded image
     // is not stored in the cache
-    function loadImage(imageId) {
+    function loadImage(imageId, options) {
         if(imageId === undefined) {
             throw "loadImage: parameter imageId must not be undefined";
         }
@@ -723,7 +787,7 @@ if(typeof cornerstone === 'undefined'){
             return imagePromise;
         }
 
-        imagePromise = loadImageFromImageLoader(imageId);
+        imagePromise = loadImageFromImageLoader(imageId, options);
         if(imagePromise === undefined) {
             throw "loadImage: no image loader for imageId";
         }
@@ -731,10 +795,10 @@ if(typeof cornerstone === 'undefined'){
         return imagePromise;
     }
 
-    // Loads an image given an imageId and returns a promise which will resolve
+    // Loads an image given an imageId and optional priority and returns a promise which will resolve
     // to the loaded image object or fail if an error occurred.  The image is
     // stored in the cache
-    function loadAndCacheImage(imageId) {
+    function loadAndCacheImage(imageId, options) {
         if(imageId === undefined) {
             throw "loadAndCacheImage: parameter imageId must not be undefined";
         }
@@ -744,7 +808,7 @@ if(typeof cornerstone === 'undefined'){
             return imagePromise;
         }
 
-        imagePromise = loadImageFromImageLoader(imageId);
+        imagePromise = loadImageFromImageLoader(imageId, options);
         if(imagePromise === undefined) {
             throw "loadAndCacheImage: no image loader for imageId";
         }
@@ -851,28 +915,11 @@ if(typeof cornerstone === 'undefined'){
      * @param invalidated - true if pixel data has been invalidated and cached rendering should not be used
      */
     function drawImage(enabledElement, invalidated) {
+        enabledElement.needsRedraw = true;
+        if (invalidated){
+            enabledElement.invalid = true;
+        }
 
-        var start = new Date();
-
-        enabledElement.image.render(enabledElement, invalidated);
-
-        var context = enabledElement.canvas.getContext('2d');
-
-        var end = new Date();
-        var diff = end - start;
-        //console.log(diff + ' ms');
-
-        var eventData = {
-            viewport : enabledElement.viewport,
-            element : enabledElement.element,
-            image : enabledElement.image,
-            enabledElement : enabledElement,
-            canvasContext: context,
-            renderTimeInMs : diff
-        };
-
-        $(enabledElement.element).trigger("CornerstoneImageRendered", eventData);
-        enabledElement.invalid = false;
     }
 
     // Module exports
@@ -1129,6 +1176,32 @@ if(typeof cornerstone === 'undefined'){
 
 }(cornerstone));
 
+/**
+ * This module polyfills requestAnimationFrame for older browsers.
+ */
+
+
+(function (cornerstone) {
+
+  'use strict';
+
+  function requestFrame(callback) {
+    window.setTimeout(callback, 1000 / 60);
+  }
+
+  function requestAnimationFrame(callback) {
+    return window.requestAnimationFrame(callback) ||
+      window.webkitRequestAnimationFrame(callback) ||
+      window.mozRequestAnimationFrame(callback) ||
+      window.oRequestAnimationFrame(callback) ||
+      window.msRequestAnimationFrame(callback) ||
+      requestFrame(callback);
+  }
+
+  // Module exports
+  cornerstone.requestAnimationFrame = requestAnimationFrame;
+
+})(cornerstone);
 /**
  * This module contains a function to convert stored pixel values to display pixel values using a LUT
  */
@@ -1400,6 +1473,7 @@ if(typeof cornerstone === 'undefined'){
     function invalidate(element) {
         var enabledElement = cornerstone.getEnabledElement(element);
         enabledElement.invalid = true;
+        enabledElement.needsRedraw = true;
         var eventData = {
             element: element
         };
@@ -1431,6 +1505,78 @@ if(typeof cornerstone === 'undefined'){
     // module exports
     cornerstone.invalidateImageId = invalidateImageId;
 }(cornerstone));
+(function($, cornerstone) {
+
+  'use strict';
+
+  // this module defines a way to access various metadata about an imageId.  This layer of abstraction exists
+  // so metadata can be provided in different ways (e.g. by parsing DICOM P10 or by a WADO-RS document)
+
+  var providers = [];
+
+  /**
+   * Adds a metadata provider with the specified priority
+   * @param provider
+   * @param priority - 0 is default/normal, > 0 is high, < 0 is low
+   */
+  function addProvider(provider, priority) {
+    priority = priority || 0; // default priority
+    // find the right spot to insert this provider based on priority
+    for(var i=0; i < providers.length; i++) {
+      if(providers[i].priority <= priority) {
+        break;
+      }
+    }
+
+    // insert the decode task at position i
+    providers.splice(i, 0, {
+      priority: priority,
+      provider: provider
+    });
+
+  }
+
+  /**
+   * Removes the specified provider
+   * @param provider
+   */
+  function removeProvider( provider) {
+    for(var i=0; i < providers.length; i++) {
+      if(providers[i].provider === provider) {
+        providers.splice(i, 1);
+        return;
+      }
+    }
+  }
+
+  /**
+   * Gets metadata from the registered metadata providers.  Will call each one from highest priority to lowest
+   * until one responds
+   *
+   * @param type
+   * @param imageId
+   * @returns {boolean}
+   */
+  function getMetaData(type, imageId) {
+    // invoke each provider in priority order until one returns something
+    for(var i=0; i < providers.length; i++) {
+      var result;
+      result = providers[i].provider(type, imageId);
+      if (result !== undefined) {
+        return result;
+      }
+    }
+  }
+
+  // module/private exports
+  cornerstone.metaData = {
+    addProvider: addProvider,
+    removeProvider: removeProvider,
+    get: getMetaData
+  };
+
+})($, cornerstone);
+
 /**
  * This module contains a helper function to covert page coordinates to pixel coordinates
  */
@@ -1691,7 +1837,7 @@ if(typeof cornerstone === 'undefined'){
         return false;
       }
       // check the unique ids
-      return (a.id !== b.id)
+      return (a.id === b.id)
     }
 
     function getLut(image, viewport, invalidated)
@@ -1991,7 +2137,7 @@ if(typeof cornerstone === 'undefined'){
         }
 
         var transform = cornerstone.internal.calculateTransform(enabledElement, scale);
-        context.setTransform(transform.m[0],transform.m[1],transform.m[2],transform.m[3],transform.m[4],transform.m[5],transform.m[6]);
+        context.setTransform(transform.m[0],transform.m[1],transform.m[2],transform.m[3],transform.m[4],transform.m[5]);
     }
 
     // Module exports
