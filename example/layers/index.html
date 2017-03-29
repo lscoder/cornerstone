@@ -33,13 +33,20 @@
             </div>
         </div>
         <div class="col-xs-2">
+            <div style="margin-bottom: 15px;">
+                <label for="syncvViewports"> Syncv Viewports</label><br>
+                <input name="syncvViewports" type="radio" value="1" checked> Yes &nbsp;&nbsp;
+                <input name="syncvViewports" type="radio" value="0"> No
+            </div>
+        </div>
+        <div class="col-xs-2">
             <label for="layers">Layers</label>
             <select name="layers" id="layers" size="2" autofocus style="width: 100%; min-width: 150px;"></select>
             <div id="properties" style="width: 100%; min-width: 150px; margin-top: 15px;">
                 <label>Properties</label>
                 <div style="width: 100%; padding: 5px 5px 5px 10px;">
                     <div style="margin-bottom: 15px;">
-                        <label for="imageOpacity"> Visible</label><br>
+                        <label for="visible"> Visible</label><br>
                         <input name="visible" type="radio" value="1"> Yes &nbsp;&nbsp;
                         <input name="visible" type="radio" value="0"> No
                     </div>
@@ -68,6 +75,7 @@
 <!-- include special code for these examples which provides images -->
 <script src="../exampleImageIdLoaderCt.js"></script>
 <script src="../exampleImageIdLoader.js"></script>
+<script src="../exampleMetaDataProvider.js"></script>
 
 <script>
 
@@ -84,19 +92,19 @@
         // Cornerstone doesn't know that it exists.
         //
         var layers = [
-            {
-                imageId: 'dicomweb:' + host + '/object-78.dcm',
-                options: {
-                    name: 'object-78.dcm'
-                }
-            },
-            {
-                imageId: 'dicomweb:' + host + '/object.SEG.dcm?frame=78',
-                options: {
-                    name: 'object.SEG.dcm',
-                    opacity: 0.5
-                }
-            }
+            // {
+            //     imageId: 'dicomweb:' + host + '/object-78.dcm',
+            //     options: {
+            //         name: 'object-78.dcm'
+            //     }
+            // },
+            // {
+            //     imageId: 'dicomweb:' + host + '/object.SEG.dcm?frame=78',
+            //     options: {
+            //         name: 'object.SEG.dcm',
+            //         opacity: 0.5
+            //     }
+            // }
             // {
             //     imageId: 'dicomweb:' + host + '/ct.dcm',
             //     options: {
@@ -109,10 +117,16 @@
             //         name: 'PET',
             //     }
             // },
+            {
+                imageId: 'example://1',
+                options: {
+                    name: 'Example 1'
+                }
+            },
             // {
-            //     imageId: 'example://1',
+            //     imageId: 'example://2',
             //     options: {
-            //         name: 'Example 1'
+            //         name: 'Example 2'
             //     }
             // },
             // {
@@ -121,13 +135,31 @@
             //         name: 'CT Example'
             //     }
             // },
-            // {
-            //     imageId: 'dicomweb:' + host + '/color.dcm',
-            //     options: {
-            //         name: 'Color image'
-            //     }
-            // }
+            {
+                imageId: 'dicomweb:' + host + '/color.dcm',
+                options: {
+                    name: 'Color image'
+                }
+            }
         ];
+
+        var orientationMarkersConfig = {
+            drawAllMarkers: true
+        }
+
+        var textMarkerConfig = {
+            'markers' : ['L5', 'L4', 'L3', 'L2', 'L1', // Lumbar spine
+                         'T12', 'T11', 'T10', 'T9', 'T8', 'T7', // Thoracic spine
+                         'T6', 'T5', 'T4', 'T3', 'T2', 'T1',
+                         'C7', 'C6', 'C5', 'C4', 'C3', 'C2', 'C1', // Cervical spine
+                         ],
+            'current': 'C7',
+            'ascending': true,
+            'loop': true,
+            'changeTextCallback': function(data, eventData, callback) {
+                callback(data, data.text + '.');
+            }
+        }
 
         function loadLayers() {
             loadImages().then(function() {
@@ -163,9 +195,31 @@
         function enableTools() {
             cornerstoneTools.mouseInput.enable(element);
             cornerstoneTools.mouseWheelInput.enable(element);
+            cornerstoneTools.magnify.enable(element);
+            cornerstoneTools.orientationMarkers.enable(element);
+            // cornerstoneTools.arrowAnnotate.setConfiguration(arrowAnnotateConfig);
+            // cornerstoneTools.seedAnnotate.setConfiguration(seedAnnotateConfig);
+            cornerstoneTools.orientationMarkers.setConfiguration(orientationMarkersConfig);
 
             // Enable all tools we want to use with this element
-            cornerstoneTools.wwwc.activate(element, 1); // ww/wc is the default tool for left mouse button
+            // cornerstoneTools.wwwc.activate(element, 1); // ww/wc is the default tool for left mouse button
+            // cornerstoneTools.probe.activate(element, 1);
+            // cornerstoneTools.dragProbe.activate(element, 1);
+            // cornerstoneTools.simpleAngle.activate(element, 1);
+            // cornerstoneTools.arrowAnnotate.activate(element, 1);
+            // cornerstoneTools.length.activate(element, 1);
+            // cornerstoneTools.freehand.activate(element, 1);
+            // cornerstoneTools.highlight.activate(element, 1);
+            // cornerstoneTools.magnify.activate(element, 1);
+
+            // cornerstoneTools.orientationMarkers.enable(element);
+            // cornerstoneTools.seedAnnotate.activate(element, 1);
+            // cornerstoneTools.textMarker.enable(element);
+            // cornerstoneTools.textMarker.setConfiguration(textMarkerConfig);
+            // cornerstoneTools.textMarker.activate(element, 1);
+            // cornerstoneTools.wwwcRegion.activate(element, 1);
+
+            cornerstoneTools.rotate.activate(element, 1);
             cornerstoneTools.pan.activate(element, 2); // pan is the default tool for middle mouse button
             cornerstoneTools.zoom.activate(element, 4); // zoom is the default tool for right mouse button
             cornerstoneTools.zoomWheel.activate(element); // zoom is the default tool for middle mouse wheel
@@ -185,6 +239,12 @@
         $('input[name=visible]').change(function(event) {
             var layer = cornerstone.getActiveLayer(element);
             layer.options.visible = (event.currentTarget.value === "1");
+            cornerstone.updateImage(element);
+        });
+
+        $('input[name=syncvViewports]').change(function(event) {
+            var enabledElement = cornerstone.getEnabledElement(element);
+            enabledElement.syncViewports = (event.currentTarget.value === "1");
             cornerstone.updateImage(element);
         });
 

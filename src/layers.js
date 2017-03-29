@@ -41,6 +41,7 @@
         var layerId = guid();
         var enabledElement = cornerstone.getEnabledElement(element);
         var layers = enabledElement.layers;
+        var viewport = cornerstone.internal.getDefaultViewport(enabledElement.canvas, image);
 
         // Set syncViewports to true by default when a new layer is added
         if (enabledElement.syncViewports === undefined) {
@@ -50,6 +51,7 @@
         var layerEnabledElement = {
             image: image,
             layerId: layerId,
+            viewport: viewport,
             options: options || {}
         };
 
@@ -104,7 +106,13 @@
             return;
         }
 
+        var layer = enabledElement.layers[index];
+
         enabledElement.activeLayerId = layerId;
+        enabledElement.image = layer.image;
+        enabledElement.viewport = layer.viewport;
+
+        cornerstone.updateImage(element);
         triggerEvent('CornerstoneActiveLayerChanged', enabledElement, layerId);
     }
 

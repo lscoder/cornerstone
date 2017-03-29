@@ -55,12 +55,14 @@
     function renderCompositeImage(enabledElement, invalidated) {
         // Calculate the base layer's default viewport parameters if they don't already exist
         // and store them
-        var baseLayer = enabledElement.layers[0];
-        baseLayer.viewport = baseLayer.viewport || cornerstone.internal.getDefaultViewport(enabledElement.canvas, baseLayer.image);
+        var baseLayer = enabledElement.layers.filter(function(layer) {
+            return layer.viewport === enabledElement.viewport;
+        })[0];
+        // baseLayer.viewport = baseLayer.viewport || cornerstone.internal.getDefaultViewport(enabledElement.canvas, baseLayer.image);
 
         // Store the base layer's viewport and image data on the enabled element so that tools can interact with it
-        enabledElement.viewport = baseLayer.viewport;
-        enabledElement.image = baseLayer.image;
+        // enabledElement.viewport = baseLayer.viewport;
+        // enabledElement.image = baseLayer.image;
 
         // Make an array of only the visible layers to save time
         var visibleLayers = enabledElement.layers.filter(function(layer) {
@@ -81,8 +83,11 @@
 
                 // If no viewport has been set yet for this layer, calculate the default viewport
                 // parameters
-                if (!layer.viewport) {
-                    layer.viewport = cornerstone.internal.getDefaultViewport(enabledElement.canvas, layer.image);
+                // if (!layer.viewport) {
+                //     layer.viewport = cornerstone.internal.getDefaultViewport(enabledElement.canvas, layer.image);
+                //     viewportRatio[layer.layerId] = layer.viewport.scale / baseLayer.viewport.scale;   
+                // }
+                if (!viewportRatio[layer.layerId]) {
                     viewportRatio[layer.layerId] = layer.viewport.scale / baseLayer.viewport.scale;   
                 }
 
