@@ -6,6 +6,12 @@
 
     "use strict";
 
+    function ensuresRenderingTools(enabledElement) {
+        if (!enabledElement.renderingTools) {
+            enabledElement.renderingTools = {};
+        }
+    }
+
     function initializeGrayscaleRenderCanvas(enabledElement, image)
     {
         var grayscaleRenderCanvas = enabledElement.renderingTools.grayscaleRenderCanvas;
@@ -150,9 +156,7 @@
         // Save the canvas context state and apply the viewport properties
         cornerstone.setToPixelCoordinateSystem(enabledElement, context);
 
-        if (!enabledElement.renderingTools) {
-            enabledElement.renderingTools = {};
-        }
+        ensuresRenderingTools(enabledElement);
 
         var renderCanvas;
         if (enabledElement.options && enabledElement.options.renderer &&
@@ -192,6 +196,7 @@
             throw "drawImage: image must be loaded before it can be drawn";
         }
 
+        ensuresRenderingTools(layer);
 
         layer.canvas = getRenderCanvas(layer, image, invalidated);
         var context = layer.canvas.getContext('2d');
@@ -205,7 +210,8 @@
             context.mozImageSmoothingEnabled = true;
         }
 
-        lastRenderedImageId = image.imageId;
+        layer.renderingTools.lastRenderedImageId = image.imageId;
+        var lastRenderedViewport = {};
         lastRenderedViewport.windowCenter = layer.viewport.voi.windowCenter;
         lastRenderedViewport.windowWidth = layer.viewport.voi.windowWidth;
         lastRenderedViewport.invert = layer.viewport.invert;
@@ -214,6 +220,7 @@
         lastRenderedViewport.vflip = layer.viewport.vflip;
         lastRenderedViewport.modalityLUT = layer.viewport.modalityLUT;
         lastRenderedViewport.voiLUT = layer.viewport.voiLUT;
+        layer.renderingTools.lastRenderedViewport = lastRenderedViewport;
     }
 
     // Module exports
