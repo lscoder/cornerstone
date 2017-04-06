@@ -1,0 +1,172 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <!-- twitter bootstrap CSS stylesheet - not required by cornerstone -->
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- cornerstone css - provides some useful css classes -->
+    <link href="../../dist/cornerstone.css" rel="stylesheet">
+
+</head>
+<body>
+<div class="container">
+
+    <h1>
+        layers/index.html
+    </h1>
+
+    Layers Example
+
+    
+    <div class="row">
+        <div class="col-xs-10">
+            <!-- note we disable selection on the top most div -->
+            <div style="width:512px;height:512px;position:relative;color: white;"
+                 class="cornerstone-enabled-image"
+                 oncontextmenu="return false"
+                 unselectable='on'
+                 onselectstart='return false;'
+                 onmousedown='return false;'>
+                <div id="dicomImage"
+                     style="width:512px;height:512px;top:0px;left:0px; position:absolute">
+                </div>
+            </div>
+        </div>
+        <div class="col-xs-2">
+            <label for="opacityImage1"> Opacity Image 1 </label>
+            <input id="opacityImage1" type="range" class="range" min=0 max=1 step=0.1 value=1>
+
+            <label for="opacityImage2"> Opacity Image 2 </label>
+            <input id="opacityImage2" type="range" class="range" min=0 max=1 step=0.1 value=1>
+        </div>
+    </div>
+</div>
+</body>
+
+<!-- cornerstone depends on jQuery so it must be loaded first-->
+<script src="../jquery.min.js"></script>
+
+<!-- include the cornerstone library -->
+<script src="../../dist/cornerstone.js"></script>
+
+<script src="../dicomParser.js"></script>
+<script src="../cornerstoneMath.js"></script>
+<script src="../cornerstoneTools.js"></script>
+<script src="../cornerstoneWADOImageLoader.js"></script>
+
+<!-- include special code for these examples which provides images -->
+<script src="../exampleImageIdLoaderCt.js"></script>
+<script src="../exampleImageIdLoader.js"></script>
+
+<script>
+
+    $(document).ready(function() {
+        // image enable the dicomImage element
+        var element = $('#dicomImage').get(0);
+        cornerstone.enable(element);
+
+        var host = window.location.href.replace('/index.html','');
+        
+        // load and display the image
+        var segFileFrameIndex = 158;
+        var imageId = 'dicomweb:' + host + '/000054.dcm';
+        var imageId2 = 'dicomweb:' + host + '/000000.dcm?frame=' + segFileFrameIndex;
+
+        //var imageId = 'ctexample://1';
+        var layer1id, layer2id;
+        cornerstone.loadImage(imageId).then(function(image) {
+            layer1id = cornerstone.addLayer(element, image, {
+                opacity: 1
+            });
+
+            metaDataLookup[imageId] = {};
+            metaDataLookup[imageId]['imagePlane'] = {
+                imagePositionPatient: image.data.string('x00200032'),
+                rowCosines: [0, 0, 1],
+                columnCosines: [0, 1, 0]
+            };
+
+            console.log('IMAGE ONE:');
+            console.log(image);
+
+            cornerstone.updateImage(element);
+
+            cornerstoneTools.mouseInput.enable(element);
+            cornerstoneTools.mouseWheelInput.enable(element);
+            // Enable all tools we want to use with this element
+            cornerstoneTools.wwwc.activate(element, 1); // ww/wc is the default tool for left mouse button
+            cornerstoneTools.pan.activate(element, 2); // pan is the default tool for middle mouse button
+            cornerstoneTools.zoom.activate(element, 4); // zoom is the default tool for right mouse button
+            cornerstoneTools.stackScrollWheel.activate(element);
+        }, function(error) {
+            console.log(error);
+        });
+        
+        var metaDataLookup = {};
+        function provider(type, imageId) {
+            var imageMetaData = metaDataLookup[imageId];
+            if (!imageMetaData) {
+                return;
+            }
+
+            if (imageMetaData.hasOwnProperty(type)) {
+                return imageMetaData[type];
+            }
+        }
+
+        cornerstoneTools.metaData.addProvider(provider);
+        cornerstone.loadImage(imageId2).then(function(image) {
+            console.log('IMAGE TWO:');
+            console.log(image);
+
+            // Retrieve pixel spacing from the shared functional group for this multi-frame image
+            // Maybe we should add logic to get this also from PerFrameFunctionalGroupsSequences?
+            var sharedFunctionalGroupSequence = image.data.elements.x52009229.items[0];
+            var pixelMeasuresSequence = sharedFunctionalGroupSequence.dataSet.elements.x00289110.items[0];
+            var pixelSpacing = pixelMeasuresSequence.dataSet.string('x00280030');
+            var split = pixelSpacing.split('\\');
+            image.rowPixelSpacing = parseFloat(split[0]);
+            image.columnPixelSpacing = parseFloat(split[1]);
+
+            var perFrameFunctionalGroupsSequence = image.data.elements.x52009230.items[segFileFrameIndex];
+            var planePositionSequence = perFrameFunctionalGroupsSequence.dataSet.elements.x00209113.items[0];
+            var imagePositionPatient = planePositionSequence.dataSet.string('x00200032');
+
+            metaDataLookup[imageId2] = {};
+            metaDataLookup[imageId2]['imagePlane'] = {
+                imagePositionPatient: imagePositionPatient,
+                rowCosines: [0, 0, 1],
+                columnCosines: [0, 1, 0]
+            };
+            
+            var lut = [];
+            lut[0] = [0, 0, 0, 0];
+            lut[1] = [129, 174, 128, 255];
+            
+            cornerstone.pixelDataToFalseColorData(image, lut);
+
+            layer2id = cornerstone.addLayer(element, image, {
+                opacity: 1
+            });
+
+            cornerstone.updateImage(element);
+
+        }, function(error) {
+            console.log(error);
+        });
+
+        $("#opacityImage1").change(function(event) {
+            var layer = cornerstone.getLayers(element, layer1id);
+            layer.options.opacity = parseFloat(event.currentTarget.value);
+            cornerstone.updateImage(element);
+        });
+
+        $("#opacityImage2").change(function(event) {
+            var layer = cornerstone.getLayers(element, layer2id);
+            layer.options.opacity = parseFloat(event.currentTarget.value);
+            cornerstone.updateImage(element);
+        });
+    });
+
+</script>
+</html>
