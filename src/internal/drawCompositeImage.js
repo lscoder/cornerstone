@@ -6,6 +6,9 @@
 
     "use strict";
 
+    // This is used to keep each of the layers' viewports in sync with the active layer
+    var syncedViewports = {};
+
     function stringToFloatArray(array) {
         return array.split('\\').map(function(value) {
                 return parseFloat(value);
@@ -55,92 +58,56 @@
     }
 
 
-    // This is used to keep each of the layers' viewports in sync with the active layer
-    var syncedViewports = {};
-    var lastSyncViewportsStatus;
-
-    /**
-     * Internal API function to draw to an enabled element
-     * @param enabledElement
-     * @param invalidated - true if pixel data has been invalidated and cached rendering should not be used
-     */
-    function renderCompositeImage(enabledElement, invalidated) {
-        var activeLayer = cornerstone.getActiveLayer(enabledElement.element);
-
-        // Make an array of only the visible layers to save time
-        var visibleLayers = enabledElement.layers.filter(function(layer) {
-            if (layer.options && layer.options.visible !== false && layer.options.opacity !== 0) {
-                return true;
-            }
-        });
-
-        var updateSyncedViewports = !lastSyncViewportsStatus && enabledElement.syncViewports;
-        lastSyncViewportsStatus = enabledElement.syncViewports;
-
-        // If we intend to keep the viewport's scale and translation in sync,
+    // Sync all viewports based on active viewport
+    function syncViewports(layers, activeLayer, syncedViewports) {
+        // If we intend to keep the viewport's scale, translation and rotation in sync,
         // loop through the layers 
-        if (enabledElement.syncViewports === true) {
-
-            if(updateSyncedViewports) {
-                syncedViewports[activeLayer.layerId] = cloneViewport(activeLayer.viewport);
+        layers.forEach(function(layer, index) {
+            // Don't do anything to the active layer
+            if (layer === activeLayer) {
+                return;
             }
 
-            visibleLayers.forEach(function(layer, index) {
+            var activeLayerSyncedViewport = syncedViewports[activeLayer.layerId];
+            var currentLayerSyncedViewport = syncedViewports[layer.layerId];
+            var viewportRatio = currentLayerSyncedViewport.scale / activeLayerSyncedViewport.scale;
 
-                // Don't do anything to the active layer
-                if (layer === activeLayer) {
-                    return;
-                }
+            // Update the layer's translation and scale to keep them in sync with the first image
+            // based on the ratios between the images
+            layer.viewport.scale = activeLayer.viewport.scale * viewportRatio;
+            layer.viewport.rotation = activeLayer.viewport.rotation;
+            layer.viewport.translation = {
+                x: (activeLayer.viewport.translation.x / viewportRatio),
+                y: (activeLayer.viewport.translation.y / viewportRatio)
+            };
+        });
+    }
 
-                if (updateSyncedViewports) {
-                    syncedViewports[layer.layerId] = cloneViewport(layer.viewport);
-                }
-
-                var activeLayerSyncedViewport = syncedViewports[activeLayer.layerId];
-                var currentLayerSyncedViewport = syncedViewports[layer.layerId];
-                var viewportRatio = currentLayerSyncedViewport.scale / activeLayerSyncedViewport.scale;
-
-                // Update the layer's translation and scale to keep them in sync with the first image
-                // based on the ratios between the images
-                layer.viewport.scale = activeLayer.viewport.scale * viewportRatio;
-                layer.viewport.rotation = activeLayer.viewport.rotation;
-                layer.viewport.translation = {
-                    x: (activeLayer.viewport.translation.x / viewportRatio), // * layer.image.width / activeLayer.image.width,
-                    y: (activeLayer.viewport.translation.y / viewportRatio)  // * layer.image.height / activeLayer.image.height
-                };
-            });    
-        }
-
-        // Get the enabled element's canvas so we can draw to it
-        var context = enabledElement.canvas.getContext('2d');
-        context.setTransform(1, 0, 0, 1, 0, 0);
-
-        // Clear the canvas
-        context.fillStyle = 'black';
-        context.fillRect(0, 0, enabledElement.canvas.width, enabledElement.canvas.height);
+    function renderLayers(context, activeLayer, layers, invalidated) {
+        var canvas = context.canvas;
 
         // Loop through each layer and draw it to the canvas
-        visibleLayers.forEach(function(layer, index) {
+        layers.forEach(function(layer, index) {
             context.save();
 
             // Set the layer's canvas to the pixel coordinate system
-            layer.canvas = enabledElement.canvas;
+            layer.canvas = canvas;
             cornerstone.setToPixelCoordinateSystem(layer, context);
 
             // Render into the layer's canvas
             if (layer.image.color === true) {
                 cornerstone.addColorLayer(layer, invalidated);
             } else {
-                cornerstone.addGrayscaleLayer(layer, invalidated);    
+                cornerstone.addGrayscaleLayer(layer, invalidated);
             }
 
             // Apply any global opacity settings that have been defined for this layer
             if (layer.options && layer.options.opacity) {
                 context.globalAlpha = layer.options.opacity;
             } else {
-                context.globalAlpha = 1;    
+                context.globalAlpha = 1;
             }
-            
+
             // Calculate any offset between the position of the active layer and the current layer
             var offset = getDrawImageOffset(layer.image.imageId, activeLayer.image.imageId);
 
@@ -151,19 +118,49 @@
         });
     }
 
-
     /**
      * Internal API function to draw a composite image to a given enabled element
      * @param enabledElement
      * @param invalidated - true if pixel data has been invalidated and cached rendering should not be used
      */
     function drawCompositeImage(enabledElement, invalidated) {
-        renderCompositeImage(enabledElement, invalidated);
+        var element = enabledElement.element;
+        var allLayers = cornerstone.getLayers(element);
+        var activeLayer = cornerstone.getActiveLayer(element);
+        var visibleLayers = cornerstone.getVisibleLayers(element);
+        var resynced = !enabledElement.lastSyncViewportsState && enabledElement.syncViewports;
+
+        // This state will help us to determine if the user has re-synced the
+        // layers allowing us to make a new copy of the viewports
+        enabledElement.lastSyncViewportsState = enabledElement.syncViewports;
+
+        // Stores a copy of all viewports if the user has just synced them then we can use
+        // them to calculate anything later (ratio, translation offset, rotation offset, etc)
+        if(resynced) {
+            allLayers.forEach(function(layer) {
+                syncedViewports[layer.layerId] = cloneViewport(layer.viewport);
+            });
+        }
+
+        // Sync all viewports in case it's activated
+        if (enabledElement.syncViewports === true) {
+            syncViewports(visibleLayers, activeLayer, syncedViewports);
+        }
+
+        // Get the enabled element's canvas so we can draw to it
+        var context = enabledElement.canvas.getContext('2d');
+        context.setTransform(1, 0, 0, 1, 0, 0);
+
+        // Clear the canvas
+        context.fillStyle = 'black';
+        context.fillRect(0, 0, enabledElement.canvas.width, enabledElement.canvas.height);
+
+        // Renders all visible layers
+        renderLayers(context, activeLayer, visibleLayers, invalidated);
     }
 
     // Module exports
     cornerstone.internal.drawCompositeImage = drawCompositeImage;
-    cornerstone.internal.renderCompositeImage = renderCompositeImage;
     cornerstone.drawCompositeImage = drawCompositeImage;
 
 }($, cornerstone));

@@ -2,7 +2,7 @@
 <html>
 <head>
     <!-- twitter bootstrap CSS stylesheet - not required by cornerstone -->
-    <link href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" rel="stylesheet">
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css" rel="stylesheet">
 
     <!-- cornerstone css - provides some useful css classes -->
     <link href="../../dist/cornerstone.css" rel="stylesheet">
@@ -15,10 +15,32 @@
         layers/index.html
     </h1>
 
-    Layers Example
+    This exemple shows you how to add and interact with layers
 
-    
-    <div class="row">
+    <div class="row" style="padding-top: 20px;">
+        <div class="col-lg-12 col-md-12 col-xs-12 col-md-offset-0">
+            <div id="tools" class="dropdown">
+                <button id="toolSelector" class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">Select tool <span class="caret"></span></button>
+                <ul class="dropdown-menu">
+                    <li class="dropdown-header">Tools</li>
+                    <li><a id="wwwc" class="list-group-item">WW/WC</a></li>
+                    <li><a id="pan" class="list-group-item">Pan</a></li>
+                    <li><a id="rotate" class="list-group-item">Rotate</a></li>
+                    <li><a id="zoom" class="list-group-item">Zoom</a></li>
+                    <li><a id="length" class="list-group-item">Length</a></li>
+                    <li><a id="probe" class="list-group-item">Probe</a></li>
+                    <li><a id="circleroi" class="list-group-item">Ellipse</a></li>
+                    <li><a id="rectangleroi" class="list-group-item">Rectangle</a></li>
+                    <li><a id="angle" class="list-group-item">Angle</a></li>
+                    <li><a id="magnify" class="list-group-item">Magnify</a></li>
+                </ul>
+                <a id="clearToolData" class="btn btn-secondary">Clear Tools</a>
+                <a id="resetViewport" class="btn btn-secondary">Reset View</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row" style="padding-top: 20px;">
         <div class="col-xs-10">
             <!-- note we disable selection on the top most div -->
             <div style="width:512px;height:512px;position:relative;color: white;"
@@ -38,8 +60,7 @@
                 <input name="syncvViewports" type="radio" value="1" checked> Yes &nbsp;&nbsp;
                 <input name="syncvViewports" type="radio" value="0"> No
             </div>
-        </div>
-        <div class="col-xs-2">
+
             <label for="layers">Layers</label>
             <select name="layers" id="layers" size="2" autofocus style="width: 100%; min-width: 150px;"></select>
             <div id="properties" style="width: 100%; min-width: 150px; margin-top: 15px;">
@@ -57,6 +78,8 @@
                 </div>
             </div>
         </div>
+        <!-- <div class="col-xs-12">
+        </div> -->
     </div>
 </div>
 </body>
@@ -73,94 +96,45 @@
 <script src="../cornerstoneWADOImageLoader.js"></script>
 
 <!-- include special code for these examples which provides images -->
-<script src="../exampleImageIdLoaderCt.js"></script>
-<script src="../exampleImageIdLoader.js"></script>
+<!-- <script src="../exampleImageIdLoaderCt.js"></script> -->
+<!-- <script src="../exampleImageIdLoader.js"></script> -->
+<script src="../petctImageIdLoader.js"></script>
 <script src="../exampleMetaDataProvider.js"></script>
+
+<!-- Latest compiled and minified JavaScript -->
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/js/bootstrap.min.js"></script>
 
 <script>
 
     $(document).ready(function() {
-        // image enable the dicomImage element
+        // Enable the dicomImage element
         var element = $('#dicomImage').get(0);
         cornerstone.enable(element);
 
         var host = window.location.href.replace('/index.html','');
 
-        // Load and display the image
-        // 
-        // The `name` option is used only by this example.
-        // Cornerstone doesn't know that it exists.
-        //
+        // JSON with all layers to be loaded
+        // The `name` option is used only by this example and
+        // cornerstone doesn't even know that it exists.
+        // You can add any option you want to `options` object.
         var layers = [
-            // {
-            //     imageId: 'dicomweb:' + host + '/object-78.dcm',
-            //     options: {
-            //         name: 'object-78.dcm'
-            //     }
-            // },
-            // {
-            //     imageId: 'dicomweb:' + host + '/object.SEG.dcm?frame=78',
-            //     options: {
-            //         name: 'object.SEG.dcm',
-            //         opacity: 0.5
-            //     }
-            // }
-            // {
-            //     imageId: 'dicomweb:' + host + '/ct.dcm',
-            //     options: {
-            //         name: 'CT',
-            //     }
-            // },
-            // {
-            //     imageId: 'dicomweb:' + host + '/pet.dcm',
-            //     options: {
-            //         name: 'PET',
-            //     }
-            // },
             {
-                imageId: 'example://1',
+                imageId: 'ct://1',
                 options: {
-                    name: 'Example 1'
+                    name: 'CT'
                 }
             },
-            // {
-            //     imageId: 'example://2',
-            //     options: {
-            //         name: 'Example 2'
-            //     }
-            // },
-            // {
-            //     imageId: 'ctexample://1',
-            //     options: {
-            //         name: 'CT Example'
-            //     }
-            // },
             {
-                imageId: 'dicomweb:' + host + '/color.dcm',
+                imageId: 'pet://1',
                 options: {
-                    name: 'Color image'
+                    name: 'PET'
                 }
             }
         ];
 
-        var orientationMarkersConfig = {
-            drawAllMarkers: true
-        }
-
-        var textMarkerConfig = {
-            'markers' : ['L5', 'L4', 'L3', 'L2', 'L1', // Lumbar spine
-                         'T12', 'T11', 'T10', 'T9', 'T8', 'T7', // Thoracic spine
-                         'T6', 'T5', 'T4', 'T3', 'T2', 'T1',
-                         'C7', 'C6', 'C5', 'C4', 'C3', 'C2', 'C1', // Cervical spine
-                         ],
-            'current': 'C7',
-            'ascending': true,
-            'loop': true,
-            'changeTextCallback': function(data, eventData, callback) {
-                callback(data, data.text + '.');
-            }
-        }
-
+        // This is the main function responsible for loading all layers
+        // This method will wait for all images to be loaded (`loadImages`)
+        // before adding the layers
         function loadLayers() {
             loadImages().then(function() {
                 var images = Array.prototype.slice.call(arguments);
@@ -177,10 +151,13 @@
                 $('#layers').prop('size', layers.length);
 
                 // Enable cornerstone tools
-                enableTools();
+                enableDefaultTools();
             });
         }
 
+        // This method loads the image of each layer and resolve the 
+        // promise only after getting all of them loaded
+        // https://api.jquery.com/jquery.when/
         function loadImages() {
             var promises = [];
 
@@ -192,62 +169,46 @@
             return $.when.apply($, promises);
         }
 
-        function enableTools() {
-            cornerstoneTools.mouseInput.enable(element);
-            cornerstoneTools.mouseWheelInput.enable(element);
-            cornerstoneTools.magnify.enable(element);
-            cornerstoneTools.orientationMarkers.enable(element);
-            // cornerstoneTools.arrowAnnotate.setConfiguration(arrowAnnotateConfig);
-            // cornerstoneTools.seedAnnotate.setConfiguration(seedAnnotateConfig);
-            cornerstoneTools.orientationMarkers.setConfiguration(orientationMarkersConfig);
+        // Select the right layer in the dropdown
+        function updateSelectedLayer(layerId) {
+            var $layers = $('#layers');
+            var currentLayerId = $layers.val();
 
-            // Enable all tools we want to use with this element
-            // cornerstoneTools.wwwc.activate(element, 1); // ww/wc is the default tool for left mouse button
-            // cornerstoneTools.probe.activate(element, 1);
-            // cornerstoneTools.dragProbe.activate(element, 1);
-            // cornerstoneTools.simpleAngle.activate(element, 1);
-            // cornerstoneTools.arrowAnnotate.activate(element, 1);
-            // cornerstoneTools.length.activate(element, 1);
-            // cornerstoneTools.freehand.activate(element, 1);
-            // cornerstoneTools.highlight.activate(element, 1);
-            // cornerstoneTools.magnify.activate(element, 1);
-
-            // cornerstoneTools.orientationMarkers.enable(element);
-            // cornerstoneTools.seedAnnotate.activate(element, 1);
-            // cornerstoneTools.textMarker.enable(element);
-            // cornerstoneTools.textMarker.setConfiguration(textMarkerConfig);
-            // cornerstoneTools.textMarker.activate(element, 1);
-            // cornerstoneTools.wwwcRegion.activate(element, 1);
-
-            cornerstoneTools.rotate.activate(element, 1);
-            cornerstoneTools.pan.activate(element, 2); // pan is the default tool for middle mouse button
-            cornerstoneTools.zoom.activate(element, 4); // zoom is the default tool for right mouse button
-            cornerstoneTools.zoomWheel.activate(element); // zoom is the default tool for middle mouse wheel
+            if(currentLayerId !== layerId) {
+                $layers.val(layerId);
+                $layers.trigger('change');
+            }
         }
 
-        $("#layers").change(function(event) {
-            var layerId = event.currentTarget.value;
-            cornerstone.setActiveLayer(element, layerId);
-        });
-
-        $("#imageOpacity").change(function(event) {
-            var layer = cornerstone.getActiveLayer(element);
-            layer.options.opacity = parseFloat(event.currentTarget.value);
-            cornerstone.updateImage(element);
-        });
-
-        $('input[name=visible]').change(function(event) {
-            var layer = cornerstone.getActiveLayer(element);
-            layer.options.visible = (event.currentTarget.value === "1");
-            cornerstone.updateImage(element);
-        });
-
+        // Listen to `change` event to activate/deactivate the viewport synchronization
         $('input[name=syncvViewports]').change(function(event) {
             var enabledElement = cornerstone.getEnabledElement(element);
             enabledElement.syncViewports = (event.currentTarget.value === "1");
             cornerstone.updateImage(element);
         });
 
+        // Listen to `change` event to set the selected layer as active
+        $("#layers").change(function(event) {
+            var layerId = event.currentTarget.value;
+            cornerstone.setActiveLayer(element, layerId);
+        });
+
+        // Listen to `change` event to update the opacity of the active layer
+        $("#imageOpacity").change(function(event) {
+            var layer = cornerstone.getActiveLayer(element);
+            layer.options.opacity = parseFloat(event.currentTarget.value);
+            cornerstone.updateImage(element);
+        });
+
+        // Listen to `change` event to update the visibility of the active layer
+        $('input[name=visible]').change(function(event) {
+            var layer = cornerstone.getActiveLayer(element);
+            layer.options.visible = (event.currentTarget.value === "1");
+            cornerstone.updateImage(element);
+        });
+
+        // This event will be called every time a layer is added through cornerstone.addLayer
+        // The layer is added to the dropdown to make it possible to select and interact with it
         $(element).on('CornerstoneLayerAdded', function(e, eventData) {
             var layer = cornerstone.getLayerById(eventData.element, eventData.layerId);
             var $layers = $('#layers');
@@ -255,34 +216,122 @@
                 .val(layer.layerId)
                 .text(layer.options.name);
 
-            $('#layers').append($layerOption);
+            // Set the layer as selected in case its the the first layer to be added
+            if($layers.children().length === 0) {
+                $layerOption.prop('selected', true);
+            }
+
+            $layers.append($layerOption);
         });
 
+        // This event will be called every time cornerstone.setActiveLayer is called
+        // We need to load the layer properties and update the selected layer in the dropdown
         $(element).on('CornerstoneActiveLayerChanged', function(e, eventData) {
             var layer = cornerstone.getActiveLayer(element);
             var opacity = layer.options.opacity == null ? 1 : layer.options.opacity;
             var visible = layer.options.visible !== false ? 1 : 0;
 
+            // Restore all properties for the active layer
             $('#imageOpacity').val(opacity);
             $("input[name=visible][value=" + visible + "]").prop('checked', true);
 
             updateSelectedLayer(eventData.layerId);
         });
 
-        function updateSelectedLayer(layerId) {
-            var $layers = $('#layers');
 
-            setTimeout(function() {
-                var currentLayerId = $layers.val();
+        /****** All code below is related with tools to make it possible to interact with layers ******/
 
-                if(currentLayerId !== layerId) {
-                    $layers.val(layerId);
-                    $layers.trigger('change');
-                }
-            }, 0);
+        // Reset to default tools
+        function resetTools() {
+            disableTools();
+            enableDefaultTools();
         }
 
+        // Enable only the default tool
+        function enableDefaultTools() {
+            cornerstoneTools.mouseInput.enable(element);
+            cornerstoneTools.mouseWheelInput.enable(element);
+            cornerstoneTools.magnify.enable(element);
+            cornerstoneTools.orientationMarkers.enable(element);
+            cornerstoneTools.orientationMarkers.setConfiguration({ drawAllMarkers: true });
+
+            cornerstoneTools.pan.activate(element, 2);
+            cornerstoneTools.zoom.activate(element, 4);
+            cornerstoneTools.zoomWheel.activate(element);
+        }
+
+        // Disable all tools
+        function disableTools() {
+            cornerstoneTools.pan.deactivate(element);
+            cornerstoneTools.rotate.deactivate(element);
+            cornerstoneTools.ellipticalRoi.deactivate(element);
+            cornerstoneTools.angle.deactivate(element);
+            cornerstoneTools.rectangleRoi.deactivate(element);
+            cornerstoneTools.length.deactivate(element);
+            cornerstoneTools.probe.deactivate(element);
+            cornerstoneTools.zoom.deactivate(element);
+            cornerstoneTools.wwwc.deactivate(element);
+            cornerstoneTools.magnify.deactivate(element);
+        }
+
+        // Set a tool as active
+        function activateSelectedTool(e, toolName) {
+            var $toolSelector = $("#toolSelector");
+
+            resetTools();
+            cornerstoneTools[toolName].activate(element, 1);
+            $toolSelector.text(e.currentTarget.innerHTML)
+        }
+
+        // Initialize the tools dropdown attaching a click listener to each of them
+        function initializeTools() {
+            // Select all tools elements and return a list of "<a>" elements
+            var $tools = $('#tools.dropdown ul li a');
+
+            // Attach a click listener to each element from the tools dropdown
+            $tools.each(function() {
+                $(this).click(function(e) {
+                    // The id of the clicked <a> element is the tool name
+                    var toolName = $(e.currentTarget).attr('id');
+
+                    // Activate the selected tool
+                    activateSelectedTool(e, toolName);
+                });
+            });
+        }
+
+        // Clear all tools
+        $('#clearToolData').click(function() {
+            var $toolSelector = $("#toolSelector");
+            var layers = cornerstone.getLayers(element);
+            var activeLayer = cornerstone.getActiveLayer(element);
+
+            resetTools();
+            toolSelector.html('Select tool <span class="caret"></span>')
+
+            var toolStateManager = cornerstoneTools.globalImageIdSpecificToolStateManager;
+
+            // Clear the tool state for each layer
+            layers.forEach(function(layer) {
+                cornerstone.setActiveLayer(element, layer.layerId);
+                toolStateManager.clear(element)
+            });
+
+            // Restore the active layer
+            cornerstone.setActiveLayer(element, activeLayer.layerId);
+            cornerstone.updateImage(element);
+        });
+
+        // Reset the viewport to the default one
+        $('#resetViewport').click(function() {
+            var canvas = $('#dicomImage canvas').get(0);
+            var enabledElement = cornerstone.getEnabledElement(element);
+            var viewport = cornerstone.getDefaultViewport(canvas, enabledElement.image)
+            cornerstone.setViewport(element, viewport);
+        });
+
         loadLayers();
+        initializeTools();
     });
 
 </script>

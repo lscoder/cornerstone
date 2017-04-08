@@ -186,6 +186,11 @@
         enabledElement.renderingTools.lastRenderedViewport = lastRenderedViewport;
     }
 
+    /**
+     * API function to draw a grayscale image to a given layer
+     * @param layer
+     * @param invalidated - true if pixel data has been invaldiated and cached rendering should not be used
+     */
     function addGrayscaleLayer(layer, invalidated) {
         if(layer === undefined) {
             throw "drawImage: layer parameter must not be undefined";
