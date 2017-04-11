@@ -72,6 +72,12 @@
                         <input name="visible" type="radio" value="0"> No
                     </div>
                     <div style="margin-bottom: 15px;">
+                        <label for="colormaps"> Colormap </label>
+                        <select id="colormaps" style="width:100%">
+                            <option value="">None</option>
+                        </select>
+                    </div>
+                    <div style="margin-bottom: 15px;">
                         <label for="imageOpacity"> Opacity</label>
                         <input id="imageOpacity" type="range" class="range" min=0 max=1 step=0.1 value=0>
                     </div>
@@ -193,6 +199,13 @@
             cornerstone.setActiveLayer(element, layerId);
         });
 
+        $('#colormaps').change(function() {
+            var layer = cornerstone.getActiveLayer(element);
+
+            layer.options.colormapId = $('#colormaps').val();
+            cornerstone.updateImage(element);
+        });
+
         // Listen to `change` event to update the opacity of the active layer
         $("#imageOpacity").change(function(event) {
             var layer = cornerstone.getActiveLayer(element);
@@ -238,6 +251,24 @@
             updateSelectedLayer(eventData.layerId);
         });
 
+
+        // Populate colormap dropdown with all the default ones
+        function fillColormapsList() {
+            var $dropdown = $('#colormaps');
+            var colormapsList = cornerstone.colors.getColormapsList();
+
+            var addOption = function(id, name) {
+                var $option = $('<option></option>')
+                    .val(id)
+                    .text(name)
+
+                $dropdown.append($option);
+            }
+
+            colormapsList.forEach(function(colormapItem) {
+                addOption(colormapItem.id, colormapItem.name);
+            });
+        }
 
         /****** All code below is related with tools to make it possible to interact with layers ******/
 
@@ -331,6 +362,7 @@
         });
 
         loadLayers();
+        fillColormapsList();
         initializeTools();
     });
 

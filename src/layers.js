@@ -37,6 +37,16 @@
         $(element).trigger(eventName, eventData);
     }
 
+    function rescaleImage(baseLayer, layer) {
+        // Column pixel spacing need to be put into account when calculating the
+        // ratio between the layer added and base layer images
+        var colRelative = (layer.image.columnPixelSpacing * layer.image.width) / (baseLayer.image.columnPixelSpacing * baseLayer.image.width);
+        var rowRelative = (layer.image.rowPixelSpacing * layer.image.height) / (baseLayer.image.rowPixelSpacing * baseLayer.image.height);
+        var viewportRatio = layer.viewport.scale / baseLayer.viewport.scale * colRelative;
+
+        layer.viewport.scale = baseLayer.viewport.scale * viewportRatio;
+    }
+
     function addLayer(element, image, options) {
         var layerId = guid();
         var enabledElement = cornerstone.getEnabledElement(element);
@@ -44,26 +54,32 @@
         var viewport = cornerstone.internal.getDefaultViewport(enabledElement.canvas, image);
 
         // Set syncViewports to true by default when a new layer is added
-        if (enabledElement.syncViewports === undefined) {
+        if (enabledElement.syncViewports !== false) {
             enabledElement.syncViewports = true;
         }
 
-        var layerEnabledElement = {
+        var newLayer = {
             image: image,
             layerId: layerId,
             viewport: viewport,
             options: options || {}
         };
 
-        layers.push(layerEnabledElement);
+        // Rescale the new layer based on the base layer to make sure
+        // they will have a proportional size (pixel spacing)
+        if(layers.length) {
+            rescaleImage(layers[0], newLayer);
+        }
 
+        layers.push(newLayer);
+
+        // Set the layer as active if it's the first layer added
         if(layers.length === 1) {
             setActiveLayer(element, layers[0].layerId);
         }
 
         triggerEvent('CornerstoneLayerAdded', enabledElement, layerId);
 
-        console.log('Layer added: ' + layerId);
         return layerId;
     }
 

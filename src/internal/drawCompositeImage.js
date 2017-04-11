@@ -94,6 +94,13 @@
             layer.canvas = canvas;
             cornerstone.setToPixelCoordinateSystem(layer, context);
 
+            // The convert the image to false color image if layer.options.colormapId
+            // exists or restore the original pixel data otherwise
+            var falseColorImageUpdated = cornerstone.convertImageToFalseColorImage(layer.image, layer.options.colormapId);
+
+            // If the image got updated it needs to be re-rendered
+            invalidated = invalidated || falseColorImageUpdated;
+
             // Render into the layer's canvas
             if (layer.image.color === true) {
                 cornerstone.addColorLayer(layer, invalidated);
