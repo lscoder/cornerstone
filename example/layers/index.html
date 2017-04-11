@@ -133,7 +133,9 @@
             {
                 imageId: 'pet://1',
                 options: {
-                    name: 'PET'
+                    name: 'PET',
+                    opacity: 0.3,
+                    colormap: 'hotIron'
                 }
             }
         ];
@@ -202,7 +204,7 @@
         $('#colormaps').change(function() {
             var layer = cornerstone.getActiveLayer(element);
 
-            layer.options.colormapId = $('#colormaps').val();
+            layer.options.colormap = $('#colormaps').val();
             cornerstone.updateImage(element);
         });
 
@@ -241,12 +243,14 @@
         // We need to load the layer properties and update the selected layer in the dropdown
         $(element).on('CornerstoneActiveLayerChanged', function(e, eventData) {
             var layer = cornerstone.getActiveLayer(element);
+            var colormap = layer.options.colormap || '';
             var opacity = layer.options.opacity == null ? 1 : layer.options.opacity;
             var visible = layer.options.visible !== false ? 1 : 0;
 
             // Restore all properties for the active layer
             $('#imageOpacity').val(opacity);
             $("input[name=visible][value=" + visible + "]").prop('checked', true);
+            $('#colormaps').val(colormap);
 
             updateSelectedLayer(eventData.layerId);
         });
@@ -361,6 +365,8 @@
             cornerstone.setViewport(element, viewport);
         });
 
+        // Start point to load all layers and colormaps and
+        // attach a click listener to each tool
         loadLayers();
         fillColormapsList();
         initializeTools();
