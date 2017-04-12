@@ -9,7 +9,6 @@
     // This is used to keep each of the layers' viewports in sync with the active layer
     var syncedViewports = {};
 
-    // Create a copy of the properties that will be cached when syncing viewports
     function cloneViewport(viewport) {
         return {
             rotation: viewport.rotation,

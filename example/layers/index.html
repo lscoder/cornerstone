@@ -18,6 +18,29 @@
     This exemple shows you how to add and interact with layers
 
     <div class="row" style="padding-top: 20px;">
+        <div class="col-lg-12 col-md-12 col-xs-12 col-md-offset-0">
+            <div id="tools" class="dropdown">
+                <button id="toolSelector" class="btn btn-primary dropdown-toggle" type="button" data-toggle="dropdown">Select tool <span class="caret"></span></button>
+                <ul class="dropdown-menu">
+                    <li class="dropdown-header">Tools</li>
+                    <li><a id="wwwc" class="list-group-item">WW/WC</a></li>
+                    <li><a id="pan" class="list-group-item">Pan</a></li>
+                    <li><a id="rotate" class="list-group-item">Rotate</a></li>
+                    <li><a id="zoom" class="list-group-item">Zoom</a></li>
+                    <li><a id="length" class="list-group-item">Length</a></li>
+                    <li><a id="probe" class="list-group-item">Probe</a></li>
+                    <li><a id="circleroi" class="list-group-item">Ellipse</a></li>
+                    <li><a id="rectangleroi" class="list-group-item">Rectangle</a></li>
+                    <li><a id="angle" class="list-group-item">Angle</a></li>
+                    <li><a id="magnify" class="list-group-item">Magnify</a></li>
+                </ul>
+                <a id="clearToolData" class="btn btn-secondary">Clear Tools</a>
+                <a id="resetViewport" class="btn btn-secondary">Reset View</a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row" style="padding-top: 20px;">
         <div class="col-xs-10">
             <!-- note we disable selection on the top most div -->
             <div style="width:512px;height:512px;position:relative;color: white;"
@@ -73,6 +96,10 @@
 <!-- include the cornerstone library -->
 <script src="../../dist/cornerstone.js"></script>
 
+<!-- include the cornerstoneTools library -->
+<script src="../cornerstoneMath.js"></script>
+<script src="../cornerstoneTools.js"></script>
+
 <!-- include special code for these examples which provides images -->
 <script src="../petctImageIdLoader.js"></script>
 <script src="../petctMetaDataProvider.js"></script>
@@ -127,6 +154,9 @@
 
                 // Update dropdown size to make all layers name visible
                 $('#layers').prop('size', layers.length);
+
+                // Enable cornerstone tools
+                enableDefaultTools();
             });
         }
 
@@ -241,50 +271,142 @@
             });
         }
 
-        // add event handlers to pan image on mouse move
-        $('#dicomImage').mousedown(function (e) {
-            var lastX = e.pageX;
-            var lastY = e.pageY;
+        // // add event handlers to pan image on mouse move
+        // $('#dicomImage').mousedown(function (e) {
+        //     var lastX = e.pageX;
+        //     var lastY = e.pageY;
 
 
-            $(document).mousemove(function (e) {
-                var deltaX = e.pageX - lastX,
-                        deltaY = e.pageY - lastY;
-                lastX = e.pageX;
-                lastY = e.pageY;
+        //     $(document).mousemove(function (e) {
+        //         var deltaX = e.pageX - lastX,
+        //                 deltaY = e.pageY - lastY;
+        //         lastX = e.pageX;
+        //         lastY = e.pageY;
 
-                var viewport = cornerstone.getViewport(element);
-                viewport.translation.x += (deltaX / viewport.scale);
-                viewport.translation.y += (deltaY / viewport.scale);
-                cornerstone.setViewport(element, viewport);
+        //         var viewport = cornerstone.getViewport(element);
+        //         viewport.translation.x += (deltaX / viewport.scale);
+        //         viewport.translation.y += (deltaY / viewport.scale);
+        //         cornerstone.setViewport(element, viewport);
+        //     });
+
+        //     $(document).mouseup(function (e) {
+        //         $(document).unbind('mousemove');
+        //         $(document).unbind('mouseup');
+        //     });
+        // });
+
+        // $('#dicomImage').on('mousewheel DOMMouseScroll', function (e) {
+        //     // Firefox e.originalEvent.detail > 0 scroll back, < 0 scroll forward
+        //     // chrome/safari e.originalEvent.wheelDelta < 0 scroll back, > 0 scroll forward
+        //     if (e.originalEvent.wheelDelta < 0 || e.originalEvent.detail > 0) {
+        //         var viewport = cornerstone.getViewport(element);
+        //         viewport.scale -= 0.25;
+        //         cornerstone.setViewport(element, viewport);
+        //     } else {
+        //         var viewport = cornerstone.getViewport(element);
+        //         viewport.scale += 0.25;
+        //         cornerstone.setViewport(element, viewport);
+        //     }
+        //     //prevent page fom scrolling
+        //     return false;
+        // }
+
+        /****** All code below is related with tools to make it possible to interact with layers ******/
+
+        // Reset to default tools
+        function resetTools() {
+            disableTools();
+            enableDefaultTools();
+        }
+
+        // Enable only the default tool
+        function enableDefaultTools() {
+            cornerstoneTools.mouseInput.enable(element);
+            cornerstoneTools.mouseWheelInput.enable(element);
+            cornerstoneTools.magnify.enable(element);
+            cornerstoneTools.orientationMarkers.enable(element);
+            cornerstoneTools.orientationMarkers.setConfiguration({ drawAllMarkers: true });
+
+            cornerstoneTools.pan.activate(element, 2);
+            cornerstoneTools.zoom.activate(element, 4);
+            cornerstoneTools.zoomWheel.activate(element);
+        }
+
+        // Disable all tools
+        function disableTools() {
+            cornerstoneTools.pan.deactivate(element);
+            cornerstoneTools.rotate.deactivate(element);
+            cornerstoneTools.ellipticalRoi.deactivate(element);
+            cornerstoneTools.angle.deactivate(element);
+            cornerstoneTools.rectangleRoi.deactivate(element);
+            cornerstoneTools.length.deactivate(element);
+            cornerstoneTools.probe.deactivate(element);
+            cornerstoneTools.zoom.deactivate(element);
+            cornerstoneTools.wwwc.deactivate(element);
+            cornerstoneTools.magnify.deactivate(element);
+        }
+
+        // Set a tool as active
+        function activateSelectedTool(e, toolName) {
+            var $toolSelector = $("#toolSelector");
+
+            resetTools();
+            cornerstoneTools[toolName].activate(element, 1);
+            $toolSelector.text(e.currentTarget.innerHTML)
+        }
+
+        // Initialize the tools dropdown attaching a click listener to each of them
+        function initializeTools() {
+            // Select all tools elements and return a list of "<a>" elements
+            var $tools = $('#tools.dropdown ul li a');
+
+            // Attach a click listener to each element from the tools dropdown
+            $tools.each(function() {
+                $(this).click(function(e) {
+                    // The id of the clicked <a> element is the tool name
+                    var toolName = $(e.currentTarget).attr('id');
+
+                    // Activate the selected tool
+                    activateSelectedTool(e, toolName);
+                });
+            });
+        }
+
+        // Clear all tools
+        $('#clearToolData').click(function() {
+            var $toolSelector = $("#toolSelector");
+            var layers = cornerstone.getLayers(element);
+            var activeLayer = cornerstone.getActiveLayer(element);
+
+            resetTools();
+            toolSelector.html('Select tool <span class="caret"></span>')
+
+            var toolStateManager = cornerstoneTools.globalImageIdSpecificToolStateManager;
+
+            // Clear the tool state for each layer
+            layers.forEach(function(layer) {
+                cornerstone.setActiveLayer(element, layer.layerId);
+                toolStateManager.clear(element)
             });
 
-            $(document).mouseup(function (e) {
-                $(document).unbind('mousemove');
-                $(document).unbind('mouseup');
-            });
+            // Restore the active layer
+            cornerstone.setActiveLayer(element, activeLayer.layerId);
+            cornerstone.updateImage(element);
         });
 
-        $('#dicomImage').on('mousewheel DOMMouseScroll', function (e) {
-            // Firefox e.originalEvent.detail > 0 scroll back, < 0 scroll forward
-            // chrome/safari e.originalEvent.wheelDelta < 0 scroll back, > 0 scroll forward
-            if (e.originalEvent.wheelDelta < 0 || e.originalEvent.detail > 0) {
-                var viewport = cornerstone.getViewport(element);
-                viewport.scale -= 0.25;
-                cornerstone.setViewport(element, viewport);
-            } else {
-                var viewport = cornerstone.getViewport(element);
-                viewport.scale += 0.25;
-                cornerstone.setViewport(element, viewport);
-            }
-            //prevent page fom scrolling
-            return false;
+        // Reset the viewport to the default one
+        $('#resetViewport').click(function() {
+            var canvas = $('#dicomImage canvas').get(0);
+            var enabledElement = cornerstone.getEnabledElement(element);
+            var viewport = cornerstone.getDefaultViewport(canvas, enabledElement.image)
+            cornerstone.setViewport(element, viewport);
         });
 
         // Start point to load all layers and colormaps and
         // also attach a click listener to each tool
         loadLayers();
         fillColormapsList();
+        initializeTools();
     });
 
 </script>

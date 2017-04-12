@@ -1,0 +1,246 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+    <!-- twitter bootstrap CSS stylesheet - not required by cornerstone -->
+    <link href="//netdna.bootstrapcdn.com/bootstrap/3.1.1/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- cornerstone css - provides some useful css classes -->
+    <link href="../../dist/cornerstone.css" rel="stylesheet">
+
+</head>
+<body>
+<div class="container">
+
+    <h1>
+        layersStack/index.html
+    </h1>
+
+    Layers (Stack) Example
+
+    
+    <div class="row">
+        <div class="col-xs-10">
+            <!-- note we disable selection on the top most div -->
+            <div style="width:512px;height:512px;position:relative;color: white;"
+                 class="cornerstone-enabled-image"
+                 oncontextmenu="return false"
+                 unselectable='on'
+                 onselectstart='return false;'
+                 onmousedown='return false;'>
+                <div id="dicomImage"
+                     style="width:512px;height:512px;top:0px;left:0px; position:absolute">
+                </div>
+            </div>
+        </div>
+        <div class="col-xs-2">
+            <div style="margin-bottom: 15px;">
+                <label for="syncvViewports"> Sync Viewports</label><br>
+                <input name="syncvViewports" type="radio" value="1" checked> Yes &nbsp;&nbsp;
+                <input name="syncvViewports" type="radio" value="0"> No
+            </div>
+        </div>
+        <div class="col-xs-2">
+            <label for="layers">Layers</label>
+            <select name="layers" id="layers" size="2" autofocus style="width: 100%; min-width: 150px;"></select>
+            <div id="properties" style="width: 100%; min-width: 150px; margin-top: 15px;">
+                <label>Properties</label>
+                <div style="width: 100%; padding: 5px 5px 5px 10px;">
+                    <div style="margin-bottom: 15px;">
+                        <label for="imageOpacity"> Visible</label><br>
+                        <input name="visible" type="radio" value="1"> Yes &nbsp;&nbsp;
+                        <input name="visible" type="radio" value="0"> No
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label for="imageOpacity"> Opacity</label>
+                        <input id="imageOpacity" type="range" class="range" min=0 max=1 step=0.1 value=0>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+
+<!-- cornerstone depends on jQuery so it must be loaded first-->
+<script src="../jquery.min.js"></script>
+
+<!-- include the cornerstone library -->
+<script src="../../dist/cornerstone.js"></script>
+
+<script src="../dicomParser.js"></script>
+<script src="../cornerstoneMath.js"></script>
+<script src="../cornerstoneTools.js"></script>
+<script src="../cornerstoneWADOImageLoader.js"></script>
+
+<!-- include special code for these examples which provides images -->
+<script src="../exampleImageIdLoaderCt.js"></script>
+<script src="../exampleImageIdLoader.js"></script>
+
+<script>
+
+    $(document).ready(function() {
+        var i;
+
+        // image enable the dicomImage element
+        var element = $('#dicomImage').get(0);
+        cornerstone.enable(element);
+
+        var host = window.location.href.replace('/index.html','');
+        var firstLayerStack = [];
+        var secondLayerStack = [];
+
+        for(i = 0; i < 10; i++) {
+            firstLayerStack.push('dicomweb:' + host + '/echo.dcm?frame=' + i);
+        }
+
+        for(i = 0; i < 200; i++) {
+            secondLayerStack.push('dicomweb:' + host + '/numbers.dcm?frame=' + i);
+        }
+
+        // Load and display the image
+        // 
+        // The `name` option is used only by this example.
+        // Cornerstone doesn't know that it exists.
+        //
+        var layers = [
+            {
+                options: {
+                    name: 'First Layer',
+                    stack: {
+                        currentImageIdIndex: 0,
+                        imageIds: firstLayerStack
+                    }
+                }
+            },
+            {
+                options: {
+                    name: 'Second Layer',
+                    stack: {
+                        currentImageIdIndex: 0,
+                        imageIds: secondLayerStack
+                    }
+                }
+            }
+        ];
+
+        function loadLayers() {
+            loadImages().then(function() {
+                var images = Array.prototype.slice.call(arguments);
+                
+                cornerstoneTools.addStackStateManager(element, ['stack']);
+
+                images.forEach(function(image, index) {
+                    var layer = layers[index];
+                    var layerId = cornerstone.addLayer(element, image, layer.options);
+
+                    cornerstone.updateImage(element);
+                    console.log('Layer ' + index + ': ' + layerId);
+                });
+
+                // Enable all tools we want to use with this element
+                cornerstoneTools.stackScroll.activate(element, 1);
+                cornerstoneTools.stackScrollWheel.activate(element);
+                cornerstoneTools.scrollIndicator.enable(element);
+                cornerstoneTools.multiLayerStackPrefetch.enable(element);
+
+
+                // Update dropdown size to make all layers name visible
+                $('#layers').prop('size', layers.length);
+
+                // Enable cornerstone tools
+                enableTools();
+
+                // Test Code
+                var enabledElement = cornerstone.getEnabledElement(element);
+                var lastLayer = enabledElement.layers[enabledElement.layers.length - 1];
+
+                lastLayer.viewport.scale = 4;
+                lastLayer.viewport.translation.y += 50;
+                lastLayer.viewport.translation.x += 35;
+            });
+        }
+
+        function loadImages() {
+            var promises = [];
+
+            layers.forEach(function(layer) {
+                var loadPromise = cornerstone.loadImage(layer.options.stack.imageIds[0]);
+                promises.push(loadPromise);
+            });
+
+            return $.when.apply($, promises);
+        }
+
+        function enableTools() {
+            cornerstoneTools.mouseInput.enable(element);
+            cornerstoneTools.mouseWheelInput.enable(element);
+
+            // Enable all tools we want to use with this element
+            cornerstoneTools.wwwc.activate(element, 1); // ww/wc is the default tool for left mouse button
+            cornerstoneTools.pan.activate(element, 2); // pan is the default tool for middle mouse button
+            cornerstoneTools.zoom.activate(element, 4); // zoom is the default tool for right mouse button
+            // cornerstoneTools.zoomWheel.activate(element); // zoom is the default tool for middle mouse wheel
+        }
+
+        $("#layers").change(function(event) {
+            var layerId = event.currentTarget.value;
+            cornerstone.setActiveLayer(element, layerId);
+        });
+
+        $("#imageOpacity").change(function(event) {
+            var layer = cornerstone.getActiveLayer(element);
+            layer.options.opacity = parseFloat(event.currentTarget.value);
+            cornerstone.updateImage(element);
+        });
+
+        $('input[name=visible]').change(function(event) {
+            var layer = cornerstone.getActiveLayer(element);
+            layer.options.visible = (event.currentTarget.value === "1");
+            cornerstone.updateImage(element);
+        });
+
+        $('input[name=syncvViewports]').change(function(event) {
+            var enabledElement = cornerstone.getEnabledElement(element);
+            enabledElement.syncViewports = (event.currentTarget.value === "1");
+            cornerstone.updateImage(element);
+        });
+
+        $(element).on('CornerstoneLayerAdded', function(e, eventData) {
+            var layer = cornerstone.getLayerById(eventData.element, eventData.layerId);
+            var $layers = $('#layers');
+            var $layerOption = $('<option></option>')
+                .val(layer.layerId)
+                .text(layer.options.name);
+
+            $('#layers').append($layerOption);
+        });
+
+        $(element).on('CornerstoneActiveLayerChanged', function(e, eventData) {
+            var layer = cornerstone.getActiveLayer(element);
+            var opacity = layer.options.opacity == null ? 1 : layer.options.opacity;
+            var visible = layer.options.visible !== false ? 1 : 0;
+
+            $('#imageOpacity').val(opacity);
+            $("input[name=visible][value=" + visible + "]").prop('checked', true);
+
+            updateSelectedLayer(eventData.layerId);
+        });
+
+        function updateSelectedLayer(layerId) {
+            var $layers = $('#layers');
+
+            setTimeout(function() {
+                var currentLayerId = $layers.val();
+
+                if(currentLayerId !== layerId) {
+                    $layers.val(layerId);
+                    $layers.trigger('change');
+                }
+            }, 0);
+        }
+
+        loadLayers();
+    });
+
+</script>
+</html>

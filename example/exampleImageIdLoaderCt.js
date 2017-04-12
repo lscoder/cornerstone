@@ -47,7 +47,6 @@
             intercept : -1024,
             windowCenter : 40,
             windowWidth : 400,
-            render: cornerstone.renderGrayscaleImage,
             getPixelData: getPixelData,
             rows: height,
             columns: width,

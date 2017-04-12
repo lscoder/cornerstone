@@ -146,6 +146,11 @@
         enabledElement.image = layer.image;
         enabledElement.viewport = layer.viewport;
 
+        // cornerstoneTools.clearToolState(element, 'stack');
+        // if(layer.options.stack) {
+        //     cornerstoneTools.addToolState(element, 'stack', layer.options.stack);
+        // }
+
         cornerstone.updateImage(element);
         triggerEvent('CornerstoneActiveLayerChanged', enabledElement, layerId);
     }
@@ -158,6 +163,49 @@
             return enabledElement.layers[index];
         }
     }
+
+    // function attachEventHandlers(enabledElement) {
+    //     $(enabledElement.element).off('CornerstoneStackScroll.Layers');
+
+    //     if(layers.length) {
+    //         $(enabledElement.element).on('CornerstoneStackScroll.Layers', onStackScroll);
+    //     }
+    // }
+
+    // function onStackScroll(event, eventData) {
+    //     var enabledElement = cornerstone.getEnabledElement(eventData.element);
+    //     var activeLayer = getActiveLayer(enabledElement.element);
+    //     var layers = enabledElement.layers;
+    //     var percent = eventData.newImageIdIndex / (eventData.stackLength - 1);
+
+    //     if(!Number.isFinite(percent)) {
+    //         percent = 0;
+    //     }
+
+    //     function getLoadImageSuccessHandler(layer) {
+    //         return function(image) {
+    //             layer.image = image;
+    //             cornerstone.updateImage(enabledElement.element);
+    //         };
+    //     }
+
+    //     for(var i = 0; i < layers.length; i++) {
+    //         var layer = layers[i];
+    //         var layerOptions = layer.options || {};
+    //         var stack = layerOptions.stack;
+
+    //         if((layers[i] === activeLayer) || !stack) {
+    //             continue;
+    //         }
+
+    //         var imageIds = stack.imageIds;
+    //         var imageIndex = Math.round((imageIds.length - 1) * percent);
+    //         var imageId = imageIds[imageIndex];
+    //         var successHandler = getLoadImageSuccessHandler(layer);
+
+    //         cornerstone.loadImage(imageId).then(successHandler);
+    //     }
+    // }
 
     // module/private exports
     cornerstone.addLayer = addLayer;
